@@ -1,232 +1,215 @@
-// Server - Phase I
+/**
+ * Camera Nodejs server application.
+ * 
+ * By Georgy St. Georgiev, 2017.
+ */
 
-var path = require('path');
-var url = require('url');
-var cookieParser = require('cookie-parser')
-var express = require('express');
-var session = require('express-session')
-var minimist = require('minimist');
-var ws = require('ws');
-var kurento = require('kurento-client');
-var fs    = require('fs');
-var https = require('https');
+'use strict';
 
-var argv = minimist(process.argv.slice(2), {
-    default: {
-        local_server_uri: 'https://localhost:8444/',
-        singaling_server_uri: 'wss://localhost:8443/cams'
+// Libs.
+const os = require( 'os' );
+const path = require( 'path' );
+const url = require( 'url' );
+const express = require( 'express' );
+const ws = require( 'ws' );
+const http = require( 'http' );
+const https = require( 'https' );
+const bodyParser = require( 'body-parser' );
+const request = require( 'request' );
+const getmac = require( 'getmac' );
+const dns = require( 'dns' );
+const ls = require( 'node-localstorage' )
+
+// Settings.
+const localStorage = new ls.LocalStorage( './scratch' );
+const camTokenKey = 'cam_token';
+const userTokenKey = 'user_token';
+const camKeys = [ 'host', 'hardware_id', 'name', camTokenKey ];
+const userKeys = [ 'username', 'password', userTokenKey ];
+
+var port = 8444;
+var appServerUrl = localStorage.getItem('app_server_url') || 'http://localhost:8000';
+var signalingServerUrl = localStorage.getItem('signaling_server_url') || 'wss://localhost:8443/cam';
+
+// Get host name and port.
+function getHost( callback ){
+    dns.lookup( os.hostname(), function ( err, host, fam ) {
+      callback( host );
+    });
+}
+
+// Retrieve local information like MAC address and host name and port. 
+function getLocalInfo( callback ) {
+    getmac.getMac( function( err, hardware_id ) { 
+        if ( err ) {
+            throw err;
+        }
+        getHost( function( host ) { 
+            const info = { hardware_id: hardware_id, host: host };
+            callback( info );
+        } );
+    } );
+}
+
+// Local storage utility fuctions:
+// 1)
+function setLocalStorageObject( keys, dict ) {
+    for ( let key of keys ) {
+        if ( dict[ key ] ) {
+            localStorage.setItem( key, dict[ key ] );
+        }
     }
-});
+    return true;
+}
+// 2) 
+function getLocalStorageObject( keys ) {
+    var dict = {};
+    for ( let key of keys ) {
+        dict[ key ] = localStorage.getItem( key );
+    }
+    return dict;
+}
+// 3
+function removeLocalStorageObject( keys ) {
+    for ( let key of keys ) {
+        localStorage.removeItem( key );
+    }
+    return true;
+}
 
-var options =
-{
-  key:  fs.readFileSync('keys/server.key'),
-  cert: fs.readFileSync('keys/server.crt')
-};
-
-// Ignore warning for self-signed certificates
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
-
-var app = express();
-/*
- * Management of sessions
- */
-app.use(cookieParser());
-
-var sessionHandler = session({
-    secret : 'none',
-    rolling : true,
-    resave : true,
-    saveUninitialized : true
-});
-
-app.use(sessionHandler);
-
-/*
- * Definition of global variables.
- */
-var sessions = {};
-var kurentoClient = null;
-
-
-/*
- * Server startup
- */
-var localUrl = url.parse(argv.local_server_uri);
-var port = localUrl.port;
-var server = https.createServer(options, app).listen(port, function() {
-    console.log('Cam server started.');
-    console.log('Open ' + url.format(localUrl) + ' with a WebRTC capable browser');
-});
-
-var wss = new ws.Server({
-    server : server,
-    path : '/cams'
-});
-
-
-wss.on('connection', function(ws) {
-    var sessionId = null;
-    var request = ws.upgradeReq;
-    var response = {
-        writeHead : {}
+// Authenticate user handler.
+function authUser( opts, callback ) {
+    const form = {
+        username: opts.username,
+        password: opts.password,
     };
-
-
-    sessionHandler(request, response, function(err) {
-        sessionId = request.session.id;
-        console.log('Connection received with sessionId ' + sessionId);
-    });
- 
-    ws.on('message', function(_message) {
-        var message = JSON.parse(_message);
-        switch (message.id) {
-        case 'start':
-            break;
-        case 'stop':
-            break;
-
-        default:
-            break;
-        }
-    });
-
-    ws.on('error', function(error) {
-        console.log('Connection ' + sessionId + ' error');
-    });
-
-    ws.on('close', function() {
-        console.log('Connection ' + sessionId + ' closed');
-    });
-});
-
-/*
- * WebSocket client
- */
-
-var client = new ws(argv.singaling_server_uri)
-
-client.on('open', function(m) {
-    console.log('Connection opened to signalling server.')
-    client.send(JSON.stringify({
-        id : 'camCalling',
-        message : "Holla, bitches!",
-        uri: "wss://" + localUrl.host + "/cams"
-    }));
-});
- 
-client.on('message', function (_message, flags) {
-    console.log('Message received');
-    var message = JSON.parse(_message);
-    //console.log(message);
-    switch (message.id) {
-    case 'rtpOffer':
-        console.log("\n==>Offer is:")
-        console.log(message.payload)
-        sendMessage(client, {
-            id: "rtpAnswer",
-            payload: 
-                "v=0\r\n" + 
-                "o=- 3695122375 3695122375 IN IP4 0.0.0.0\r\n" + 
-                "s=Camera One\r\n" + 
-                "c=IN IP4 0.0.0.0\r\n" + 
-                "t=0 0\r\n" + 
-                "m=audio 5200/2 RTP/AVPF 96 0 97\r\n" + 
-                "a=extmap:3 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\n" + 
-                "a=rtpmap:96 opus/48000/2\r\n" + 
-                "a=rtpmap:97 AMR/8000\r\n" + 
-                "a=mid:audio0\r\n" + 
-                "a=ssrc:554359903 cname:user70565615@host-e49ed4e\r\n" + 
-                "m=video 5200/2 RTP/AVPF 102 103\r\n" + 
-                "a=extmap:3 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\n" + 
-                "a=rtpmap:102 VP8/90000\r\n" + 
-                "a=rtpmap:103 H264/90000\r\n" + 
-                "a=mid:video0\r\n" + 
-                "a=rtcp-fb:102 nack\r\n" + 
-                "a=rtcp-fb:102 nack pli\r\n" + 
-                "a=rtcp-fb:102 ccm fir\r\n" + 
-                "a=rtcp-fb:103 nack\r\n" + 
-                "a=rtcp-fb:103 nack pli\r\n" + 
-                "a=rtcp-fb:103 ccm fir\r\n" + 
-                "a=ssrc:2928770360 cname:user70565615@host-e49ed4e\r\n"
+    request( { url: opts.url, form: form, method: 'POST' }, function ( error, response, _user ) {
+        console.log( 'headers', response.headers );
+        console.log( 'error:', error ); // Print the error if one occurred
+        console.log( 'statusCode:', response && response.statusCode ); // Print the response status code if a response was received
+        if ( response && response.statusCode == 200 ) {
+            var user = {};
+            if ( _user ) {
+                user = JSON.parse( _user );
             }
-        );
-        break
-        
-        break
-
-    }
-  // flags.binary will be set if a binary data is received. 
-  // flags.masked will be set if the data was masked. 
-});
-
-
-client.on('error', function(error) {
-    console.log("\n==> Error:")
-    console.error(error)
-});
-
-//setTimeout(function(){
-    
-//}, 1000)
-    
-
-
-/*
- * Definition of functions
- */
-
-// Recover kurentoClient for the first time.
-function getKurentoClient(callback) {
-    if (kurentoClient !== null) {
-        return callback(null, kurentoClient);
-    }
-
-    kurento(argv.ws_uri, function(error, _kurentoClient) {
-        if (error) {
-            console.log("Could not find media server at address " + argv.ws_uri);
-            return callback("Could not find media server at address" + argv.ws_uri
-                    + ". Exiting with error " + error);
+            callback( user );
+        } else {
+            res.status( response.statusCode ).send( 'Server is not happy :|' );
         }
-
-        kurentoClient = _kurentoClient;
-        callback(null, kurentoClient);
     });
 }
 
-
-/*
- * Basic functions
- */
-function onStart(sessionId, ws, sdpWebRtcOffer, callback) {
-    console.log('\n==> Starting ...\n')
+// Auth camera handler.
+function authCam( opts, callback ) {
+    getLocalInfo( function( info ) {
+        const user_token = localStorage.getItem( userTokenKey );
+        if ( user_token ) {
+            const headers = { 'Authorization': 'Token ' + user_token }; 
+            const form = {
+                name: opts.name,
+                hardware_id: info.hardware_id,
+                host: info.host,
+            };
+            request( { url: opts.url, headers: headers, form: form, method: 'POST' }, function ( error, response, _cam) {
+                console.log( 'headers', response.headers )
+                console.log( 'error:', error ); // Print the error if one occurred
+                console.log( 'statusCode:', response && response.statusCode ); // Print the response status code if a response was received
+                if ( response && ( response.statusCode == 200 || response.statusCode == 201 ) ) {
+                    var cam = {};
+                    if ( _cam ) {
+                        cam = JSON.parse( _cam );
+                    }
+                    callback( cam );
+                } else {
+                    return response.status( response.statusCode ).send( 'Server is not happy :|' );
+                }
+            } );
+        } else {
+            console.error( 'User has not authed.' );
+        }
+    } );
 }
 
-function onConnection() {
-
+function checkAuth() {
+    const cam_token = localStorage.getItem( camTokenKey );
+    const user_token = localStorage.getItem( userTokenKey );
+    const isAuthed = ( ( cam_token != undefined ) && ( user_token != undefined ) );
+    console.log( 'Checking auth:' + isAuthed );
+    return isAuthed;
 }
 
-function onStop(sessionId) {
-    if (sessions[sessionId]) {
-        console.info('Releasing pipeline');
-        delete sessions[sessionId];
+//
+function tryToConnectToSignalingServer() {
+    if ( checkAuth() ) {
+        console.log( "Authed and ready to stream." );
+    } else {
+        console.log( "Needs authentication. Go to https://localhost:" + port + " and log in." );
     }
 }
 
-function onError(error) {
-  if(error)
-  {
-    console.error(error);
-  }
-}
+// Express app.
+var app = express();
+app.use( express.static( path.join( __dirname, 'static' ) ) );
+app.use( bodyParser.urlencoded( { extended: false } ) );
+
+app.post( '/logout', function( req, res ) {
+    removeLocalStorageObject( userKeys );
+    removeLocalStorageObject( camKeys );
+    console.log('Logout successful.');
+    return res.json( { is_authed: false } );
+} );
+
+app.get( '/is-authed', function( req, res ) {
+    const cam = getLocalStorageObject( camKeys );
+    const user = getLocalStorageObject( userKeys );
+    const isAuthed = checkAuth();
+
+    if ( isAuthed ) {
+        return res.json( { is_authed: isAuthed, cam: cam, user: user } );
+    } else {
+        return res.json( { is_authed: isAuthed } );
+    }
+    
+} );
+
+app.post( '/auth', function( req, res ) { 
+    const opts = req.body;
+    const userAuthUrl = appServerUrl + '/api-token-auth';
+    const camRegistrationUrl = appServerUrl + '/cams';
+    const userOpts = {
+        username: opts.username,
+        password: opts.password,
+        url: userAuthUrl,
+    };
+    const camOpts = {
+        name: opts.name,
+        url: camRegistrationUrl,
+    };
+    authUser( userOpts, function ( user ) {
+        console.log( 'Authed user:' );
+        console.log( user );
+        user.username = opts.username;
+        user.user_token = user.token;
+        delete user.token;
+        setLocalStorageObject( userKeys, user );
+        authCam( camOpts, function( cam ) {
+            console.log( 'Authed cam:' );
+            console.log( cam );
+            cam.cam_token = cam.token;
+            delete cam.token;
+            setLocalStorageObject( camKeys, cam );
+            tryToConnectToSignalingServer();
+            return res.status( 200 ).json( { cam: cam, user: user } );
+        } );
+    } );
+} );
+
+app.listen( port, function( err ) {
+    if ( err ) {
+        throw err;
+    }
+    console.log( 'Cam server started @ http://localhost:' + port + '.' );
+    tryToConnectToSignalingServer();
+} );
 
 
-function sendMessage(ws, message) {
-    var jsonMessage = JSON.stringify(message);
-    console.log('Senging message: ' + jsonMessage);
-    ws.send(jsonMessage);
-}
-
-
-
-app.use(express.static(path.join(__dirname, 'static')));
