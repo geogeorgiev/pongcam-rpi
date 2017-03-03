@@ -19,18 +19,26 @@ const request = require( 'request' );
 const getmac = require( 'getmac' );
 const dns = require( 'dns' );
 const ls = require( 'node-localstorage' )
+const config = require('config');
+const utils = require( './libs/utils.js' );
 
 // Settings.
-const localStorage = new ls.LocalStorage( './scratch' );
 const camTokenKey = 'cam_token';
 const userTokenKey = 'user_token';
 const camKeys = [ 'host', 'hardware_id', 'name', camTokenKey ];
-const userKeys = [ 'username', 'password', userTokenKey ];
+const userKeys = [ 'username', userTokenKey ];
 
-var port = 8444;
-var appServerUrl = localStorage.getItem('app_server_url') || 'http://localhost:8000';
-var signalingServerUrl = localStorage.getItem('signaling_server_url') || 'wss://localhost:8443/cam';
+const env = process.env.NODE_ENV
+const localStorage = new ls.LocalStorage( config.LOCAL_STORAGE_DIR + "/" + env );
+const store = new utils.Storage( localStorage );
 
+const localServerUrlDict = url.parse( config.LOCAL_API.base )
+const port = localServerUrlDict.port;
+
+const appServerUrl = config.APP_API.base;
+const authUrl = appServerUrl + config.APP_API.auth;
+const camsUrl = appServerUrl + config.APP_API.cams;
+    
 // Get host name and port.
 function getHost( callback ){
     dns.lookup( os.hostname(), function ( err, host, fam ) {
@@ -45,50 +53,21 @@ function getLocalInfo( callback ) {
             throw err;
         }
         getHost( function( host ) { 
-            const info = { hardware_id: hardware_id, host: host };
+            let info = { hardware_id: hardware_id, host: host };
             callback( info );
         } );
     } );
 }
 
-// Local storage utility fuctions:
-// 1)
-function setLocalStorageObject( keys, dict ) {
-    for ( let key of keys ) {
-        if ( dict[ key ] ) {
-            localStorage.setItem( key, dict[ key ] );
-        }
-    }
-    return true;
-}
-// 2) 
-function getLocalStorageObject( keys ) {
-    var dict = {};
-    for ( let key of keys ) {
-        dict[ key ] = localStorage.getItem( key );
-    }
-    return dict;
-}
-// 3
-function removeLocalStorageObject( keys ) {
-    for ( let key of keys ) {
-        localStorage.removeItem( key );
-    }
-    return true;
-}
-
 // Authenticate user handler.
-function authUser( opts, callback ) {
-    const form = {
+function authUser( opts, httpClient, callback ) {
+    let form = {
         username: opts.username,
         password: opts.password,
     };
-    request( { url: opts.url, form: form, method: 'POST' }, function ( error, response, _user ) {
-        console.log( 'headers', response.headers );
-        console.log( 'error:', error ); // Print the error if one occurred
-        console.log( 'statusCode:', response && response.statusCode ); // Print the response status code if a response was received
+    httpClient( { url: opts.url, form: form, method: 'POST' }, function ( error, response, _user ) {
         if ( response && response.statusCode == 200 ) {
-            var user = {};
+            let user = {};
             if ( _user ) {
                 user = JSON.parse( _user );
             }
@@ -100,22 +79,18 @@ function authUser( opts, callback ) {
 }
 
 // Auth camera handler.
-function authCam( opts, callback ) {
-    getLocalInfo( function( info ) {
-        const user_token = localStorage.getItem( userTokenKey );
-        if ( user_token ) {
-            const headers = { 'Authorization': 'Token ' + user_token }; 
-            const form = {
+function authCam( opts, httpClient, callback ) {
+     getLocalInfo( function( info ) {
+        if ( opts.user_token ) {
+            let  form = {
                 name: opts.name,
                 hardware_id: info.hardware_id,
                 host: info.host,
             };
-            request( { url: opts.url, headers: headers, form: form, method: 'POST' }, function ( error, response, _cam) {
-                console.log( 'headers', response.headers )
-                console.log( 'error:', error ); // Print the error if one occurred
-                console.log( 'statusCode:', response && response.statusCode ); // Print the response status code if a response was received
+            const headers = { 'Authorization': 'Token ' + opts.user_token }; 
+            httpClient( { url: opts.url, headers: headers, form: form, method: 'POST' }, function ( error, response, _cam) {
                 if ( response && ( response.statusCode == 200 || response.statusCode == 201 ) ) {
-                    var cam = {};
+                    let cam = {};
                     if ( _cam ) {
                         cam = JSON.parse( _cam );
                     }
@@ -123,24 +98,24 @@ function authCam( opts, callback ) {
                 } else {
                     return response.status( response.statusCode ).send( 'Server is not happy :|' );
                 }
-            } );
+            });
         } else {
             console.error( 'User has not authed.' );
         }
-    } );
+    });
 }
 
-function checkAuth() {
-    const cam_token = localStorage.getItem( camTokenKey );
-    const user_token = localStorage.getItem( userTokenKey );
-    const isAuthed = ( ( cam_token != undefined ) && ( user_token != undefined ) );
-    console.log( 'Checking auth:' + isAuthed );
+// Check if tokens are available and hence user and cam are authed.
+function checkAuth(store) {
+    let  cam_token = store.getItem( camTokenKey );
+    let  user_token = store.getItem( userTokenKey );
+    let  isAuthed = ( ( cam_token != undefined ) && ( user_token != undefined ) );
     return isAuthed;
 }
 
-//
+// Try to connect to signaling server.
 function tryToConnectToSignalingServer() {
-    if ( checkAuth() ) {
+    if ( checkAuth( store ) ) {
         console.log( "Authed and ready to stream." );
     } else {
         console.log( "Needs authentication. Go to https://localhost:" + port + " and log in." );
@@ -148,68 +123,71 @@ function tryToConnectToSignalingServer() {
 }
 
 // Express app.
-var app = express();
+let app = express();
 app.use( express.static( path.join( __dirname, 'static' ) ) );
-app.use( bodyParser.urlencoded( { extended: false } ) );
+app.use( bodyParser.json() );                                     
+app.use( bodyParser.urlencoded( { extended: true } ) );               
+app.use( bodyParser.text() );                                    
+app.use( bodyParser.json( { type: 'application/json' } ) );  
 
-app.post( '/logout', function( req, res ) {
-    removeLocalStorageObject( userKeys );
-    removeLocalStorageObject( camKeys );
-    console.log('Logout successful.');
-    return res.json( { is_authed: false } );
-} );
+app.httpClient = request;
 
-app.get( '/is-authed', function( req, res ) {
-    const cam = getLocalStorageObject( camKeys );
-    const user = getLocalStorageObject( userKeys );
-    const isAuthed = checkAuth();
-
-    if ( isAuthed ) {
-        return res.json( { is_authed: isAuthed, cam: cam, user: user } );
-    } else {
-        return res.json( { is_authed: isAuthed } );
-    }
-    
-} );
-
-app.post( '/auth', function( req, res ) { 
-    const opts = req.body;
-    const userAuthUrl = appServerUrl + '/api-token-auth';
-    const camRegistrationUrl = appServerUrl + '/cams';
-    const userOpts = {
-        username: opts.username,
-        password: opts.password,
-        url: userAuthUrl,
-    };
-    const camOpts = {
-        name: opts.name,
-        url: camRegistrationUrl,
-    };
-    authUser( userOpts, function ( user ) {
-        console.log( 'Authed user:' );
-        console.log( user );
-        user.username = opts.username;
-        user.user_token = user.token;
-        delete user.token;
-        setLocalStorageObject( userKeys, user );
-        authCam( camOpts, function( cam ) {
-            console.log( 'Authed cam:' );
-            console.log( cam );
-            cam.cam_token = cam.token;
-            delete cam.token;
-            setLocalStorageObject( camKeys, cam );
-            tryToConnectToSignalingServer();
-            return res.status( 200 ).json( { cam: cam, user: user } );
-        } );
-    } );
-} );
+app.route( '/auth' )
+    .get( function( req, res ) {
+        let  cam = store.getLocalStorageObject( camKeys );
+        let  user = store.getLocalStorageObject( userKeys );
+        let  isAuthed = checkAuth( store );
+        if ( isAuthed ) {
+            return res.json( { is_authed: isAuthed, cam: cam, user: user } );
+        } else {
+            return res.json( { is_authed: isAuthed } );
+        }
+    })
+    .delete( function( req, res ) { 
+        store.removeLocalStorageObject( userKeys );  
+        store.removeLocalStorageObject( camKeys );
+        return res.json( { is_authed: false } );
+    })
+    .post( function( req, res ) { 
+        let body = req.body;
+        let opts = {};
+        opts.user = {
+            username: body.username,
+            password: body.password,
+            url: authUrl,
+        };
+        opts.cam = {
+            name: body.name,
+            url: camsUrl,
+        };
+        authUser( opts.user, app.httpClient, function ( user ) {
+            user.user_token = user.token;
+            user.username = opts.user.username;
+            opts.cam.user_token = user.token;
+            authCam( opts.cam, app.httpClient, function( cam ) {
+                cam.cam_token = cam.token;
+                delete user.token;
+                delete cam.token;
+                store.setLocalStorageObject( userKeys, user );
+                store.setLocalStorageObject( camKeys, cam );
+                let  isAuthed = checkAuth( store );
+                return res.json( { is_authed: isAuthed, cam: cam, user: user } );
+            });
+            
+        });
+    });
 
 app.listen( port, function( err ) {
     if ( err ) {
         throw err;
     }
     console.log( 'Cam server started @ http://localhost:' + port + '.' );
-    tryToConnectToSignalingServer();
+    //tryToConnectToSignalingServer();
 } );
 
-
+module.exports = { 
+    app: app,
+    store: store,
+    httpClient: request,
+    checkAuth: checkAuth
+}; // for testing

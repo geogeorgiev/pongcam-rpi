@@ -1,27 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-
-  <title>Camera App</title>
+  <title>Baiivan</title>
   <meta charset="utf-8">
   <meta http-equiv="cache-control" content="no-cache">
   <meta http-equiv="pragma" content="no-cache">
   <meta http-equiv="expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!--<link rel="shortcut icon" href="img/kurento.png" type="image/png" />-->
+  <link rel="shortcut icon" href="img/icon.png" type="image/png" />
   <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.min.css">  
   <link rel="stylesheet" href="css/main.css">
-
-  <!--<script src="bower_components/adapter.js/adapter.js"></script>-->
   <script src="bower_components/jquery/dist/jquery.min.js"></script>
   <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
-  <!--<script src="bower_components/kurento-utils/js/kurento-utils.js"></script>-->
-  <script src="/js/vue.min.js"></script>
-  
-  
+  <script src="bower_components/vue/dist/vue.min.js"></script>
 </head>
 <body>
-
   <header>
     <div class="navbar navbar-inverse navbar-fixed-top">
       <div class="container">
@@ -33,31 +26,25 @@
   </header>
   <div class="container">
     <div id="app" class="row">
-      
-      <div v-if="!isAuthed">
-        <p>Please log in to enable the camera</p>
-        <input v-model="username" type="text" name="username">
-        <input v-model="password" type="password" name="passowrd"><br>
-        <a class="btn" v-on:click="auth">Login</a>
-      </div>
-      <div v-if="isAuthed">
-        <p>Logged in as {{ username }}</p>
-        <p>Cam: {{ camName }}</p>
-        <a class="btn" v-on:click="logout">Logout</a>
-      </div>
+      <form class="well col-sm-4 col-xs-12">
+        <div v-if="!isAuthed" class="form-group">
+          <p class="">Please log in to enable the camera</p>
+          <label for="username">Username:</label>
+          <input v-model="username" type="text" name="username" class="form-control">
+          <label for="password">Password:</label>
+          <input v-model="password" type="password" name="password" class="form-control">
+          <hr>
+          <a class="btn btn-primary" v-on:click="auth">Login</a>
+        </div>
+        <div v-if="isAuthed">
+          <p>Logged in as: <i>{{ username }}</i></p>
+          <p>Cam: <i>{{ camName }}</i></p>
+          <hr>
+          <a class="btn btn-danger" v-on:click="logout">Logout</a>
+        </div>
+      </form>
     </div>
-  
-    <div class="row">
-      <div class="col-md-12">
-
-        <!--<a id="start" href="#" class="btn btn-success"><span class="glyphicon glyphicon-play"></span> Start</a>
-        <a id="stop" href="#" class="btn btn-danger"><span class="glyphicon glyphicon-stop"></span> Stop</a>
-        -->
-      </div>
-    </div>
-    
   </div>
-
   <script src="js/main.js"></script>
 </body>
 </html>

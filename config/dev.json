@@ -1,0 +1,15 @@
+{
+  "LOCAL_STORAGE_DIR": "./local_storage",
+  "APP_API": {
+    "base": "http://localhost:8000",
+    "cams": "/cams",
+    "auth": "/api-token-auth"
+  },
+  "LOCAL_API": {
+    "base": "http://localhost:8444",
+    "auth": "/auth"
+  },
+  "SIGNALING_API": {
+    "base": "wss://localhost:8443/cam"
+  }
+}

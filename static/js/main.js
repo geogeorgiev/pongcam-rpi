@@ -35,8 +35,9 @@ var vm = new Vue( {
     },
     logout: function() {
       var $this = this;
-      $.post( {
-        url: this.baseUrl + '/logout',
+      $.ajax( {
+        method: 'DELETE',
+        url: this.baseUrl + '/auth',
         success: function( res, status, obj ) {
           console.log( 'Logout successful.' );
           $this.isAuthed = false;
@@ -50,7 +51,7 @@ var vm = new Vue( {
       console.log( 'Checking auth @ ' + this.baseUrl + '/is-authed.' );
       var $this = this;
       $.get( {
-        url : this.baseUrl + '/is-authed',
+        url : this.baseUrl + '/auth',
         success: function( res, status, obj ) {
           console.log( 'Checking auth is successful. Is authed: ' + res.is_authed + '.');
           console.log( res );
