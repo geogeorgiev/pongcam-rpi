@@ -7,187 +7,175 @@
 'use strict';
 
 // Libs.
-const os = require( 'os' );
-const path = require( 'path' );
-const url = require( 'url' );
-const express = require( 'express' );
-const ws = require( 'ws' );
-const http = require( 'http' );
-const https = require( 'https' );
-const bodyParser = require( 'body-parser' );
-const request = require( 'request' );
-const getmac = require( 'getmac' );
-const dns = require( 'dns' );
-const ls = require( 'node-localstorage' )
+const LIB_PATH = './lib';
+const os = require('os');
+const path = require('path');
+const url = require('url');
+const express = require('express');
+const bodyParser = require('body-parser');
+const WS = require('ws');
+const http = require('http');
 const config = require('config');
-const utils = require( './libs/utils.js' );
+const request = require('request');
+const getmac = require('getmac');
 
-// Settings.
-const camTokenKey = 'cam_token';
-const userTokenKey = 'user_token';
-const camKeys = [ 'host', 'hardware_id', 'name', camTokenKey ];
-const userKeys = [ 'username', userTokenKey ];
+const MediaClient = require(LIB_PATH + '/media/KurentoClient');
 
-const env = process.env.NODE_ENV
-const localStorage = new ls.LocalStorage( config.LOCAL_STORAGE_DIR + "/" + env );
-const store = new utils.Storage( localStorage );
+const InMemoryStore = require(LIB_PATH + '/db/InMemoryDB');
+const DiskStore = require(LIB_PATH + '/store/DiskStore');
 
-const localServerUrlDict = url.parse( config.LOCAL_API.base )
-const port = localServerUrlDict.port;
+const CameraHandler = require(LIB_PATH + '/handler/CameraHandler');
+const AppHandler = require(LIB_PATH + '/handler/AppHandler');
 
-const appServerUrl = config.APP_API.base;
-const authUrl = appServerUrl + config.APP_API.auth;
-const camsUrl = appServerUrl + config.APP_API.cams;
-    
-// Get host name and port.
-function getHost( callback ){
-    dns.lookup( os.hostname(), function ( err, host, fam ) {
-      callback( host );
-    });
+// Constants
+
+const SDP_OFFER_KEY = 'sdp_offer';
+const SDP_ANSWER_KEY = 'sdp_answer';
+const START_STREAM_KEY = 'start_stream';
+const STOP_STREAM_KEY = 'stop_stream';
+const STREAM_ID_KEY = 'stream_token';
+const START_SESSION_KEY = 'start_session';
+const SESSION_ID_KEY = 'session_id';
+const CLOSE_KEY = 'close';
+const ERROR_KEY = 'error';
+const MESSAGE_KEY = 'message';
+const OPEN_KEY = 'open';
+
+const CAM_REGISTER_KEY = 'cam_register';
+const CAM_MODE_KEY = 'cam_mode';
+const CAM_STATE_KEY = 'cam_state';
+
+const CAM_ID_KEY = 'cam_token';
+const USER_ID_KEY = 'user_token';
+const HAS_LOGGED_IN_KEY = 'has_logged_in';
+const HARDWARE_ID_KEY = 'hardware_id';
+
+const ENV = process.env.NODE_ENV;
+
+const APP_URL = config.APP_API.BASE;
+const AUTH_URL = APP_URL + config.APP_API.AUTH;
+const CAM_URL = APP_URL + config.APP_API.CAMS;
+
+const SIGNALING_URL = config.SIGNALING_API.BASE;
+const MAX_TIMEOUT = config.RECONNECT_MAX_TIMEOUT;
+
+// Instances
+const diskStore = new DiskStore(config.LOCAL_STORAGE_DIR + "/" + ENV);
+const localUrlParsed = url.parse(config.LOCAL_API.BASE);
+const PORT = localUrlParsed.port;
+
+if (ENV === 'dev') {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // Ignore warning for self-signed certificates
 }
 
-// Retrieve local information like MAC address and host name and port. 
-function getLocalInfo( callback ) {
-    getmac.getMac( function( err, hardware_id ) { 
-        if ( err ) {
-            throw err;
-        }
-        getHost( function( host ) { 
-            let info = { hardware_id: hardware_id, host: host };
-            callback( info );
-        } );
-    } );
-}
+/**
+ * Http server
+ */
+var app = express();
+var app_handler = new AppHandler(diskStore, request);
+app.use(express.static(path.join(__dirname, 'static')));                                  
+app.use(bodyParser.urlencoded({extended : true}));               
+app.use(bodyParser.text());                                    
+app.use(bodyParser.json({type : 'application/json'}));  
 
-// Authenticate user handler.
-function authUser( opts, httpClient, callback ) {
-    let form = {
-        username: opts.username,
-        password: opts.password,
-    };
-    httpClient( { url: opts.url, form: form, method: 'POST' }, function ( error, response, _user ) {
-        if ( response && response.statusCode == 200 ) {
-            let user = {};
-            if ( _user ) {
-                user = JSON.parse( _user );
-            }
-            callback( user );
-        } else {
-            res.status( response.statusCode ).send( 'Server is not happy :|' );
-        }
-    });
-}
 
-// Auth camera handler.
-function authCam( opts, httpClient, callback ) {
-     getLocalInfo( function( info ) {
-        if ( opts.user_token ) {
-            let  form = {
-                name: opts.name,
-                hardware_id: info.hardware_id,
-                host: info.host,
-            };
-            const headers = { 'Authorization': 'Token ' + opts.user_token }; 
-            httpClient( { url: opts.url, headers: headers, form: form, method: 'POST' }, function ( error, response, _cam) {
-                if ( response && ( response.statusCode == 200 || response.statusCode == 201 ) ) {
-                    let cam = {};
-                    if ( _cam ) {
-                        cam = JSON.parse( _cam );
-                    }
-                    callback( cam );
-                } else {
-                    return response.status( response.statusCode ).send( 'Server is not happy :|' );
-                }
-            });
-        } else {
-            console.error( 'User has not authed.' );
-        }
-    });
-}
+// User auth routes
+app.route(config.LOCAL_API.AUTH)
+.get(function(req, res) {
+    app_handler.hasLoggedIn(req, res);
+})
+.delete(function(req, res) { 
+    app_handler.logOut(req, res);
+})
+.post(function(req, res) { 
+    app_handler.logIn(req, res, connectToServer);
+});
 
-// Check if tokens are available and hence user and cam are authed.
-function checkAuth(store) {
-    let  cam_token = store.getItem( camTokenKey );
-    let  user_token = store.getItem( userTokenKey );
-    let  isAuthed = ( ( cam_token != undefined ) && ( user_token != undefined ) );
-    return isAuthed;
-}
+// Cam routes
+app.route(config.LOCAL_API.CAMS)
+.get(function(req, res) {
+    app_handler.getCam(req, res);
+})
+.post(function(req, res) { 
+    app_handler.postCam(req, res);
+});
 
-// Try to connect to signaling server.
-function tryToConnectToSignalingServer() {
-    if ( checkAuth( store ) ) {
-        console.log( "Authed and ready to stream." );
-    } else {
-        console.log( "Needs authentication. Go to https://localhost:" + port + " and log in." );
-    }
-}
-
-// Express app.
-let app = express();
-app.use( express.static( path.join( __dirname, 'static' ) ) );
-app.use( bodyParser.json() );                                     
-app.use( bodyParser.urlencoded( { extended: true } ) );               
-app.use( bodyParser.text() );                                    
-app.use( bodyParser.json( { type: 'application/json' } ) );  
-
-app.httpClient = request;
-
-app.route( '/auth' )
-    .get( function( req, res ) {
-        let  cam = store.getLocalStorageObject( camKeys );
-        let  user = store.getLocalStorageObject( userKeys );
-        let  isAuthed = checkAuth( store );
-        if ( isAuthed ) {
-            return res.json( { is_authed: isAuthed, cam: cam, user: user } );
-        } else {
-            return res.json( { is_authed: isAuthed } );
-        }
-    })
-    .delete( function( req, res ) { 
-        store.removeLocalStorageObject( userKeys );  
-        store.removeLocalStorageObject( camKeys );
-        return res.json( { is_authed: false } );
-    })
-    .post( function( req, res ) { 
-        let body = req.body;
-        let opts = {};
-        opts.user = {
-            username: body.username,
-            password: body.password,
-            url: authUrl,
-        };
-        opts.cam = {
-            name: body.name,
-            url: camsUrl,
-        };
-        authUser( opts.user, app.httpClient, function ( user ) {
-            user.user_token = user.token;
-            user.username = opts.user.username;
-            opts.cam.user_token = user.token;
-            authCam( opts.cam, app.httpClient, function( cam ) {
-                cam.cam_token = cam.token;
-                delete user.token;
-                delete cam.token;
-                store.setLocalStorageObject( userKeys, user );
-                store.setLocalStorageObject( camKeys, cam );
-                let  isAuthed = checkAuth( store );
-                return res.json( { is_authed: isAuthed, cam: cam, user: user } );
-            });
-            
+// Run the server.
+app.listen(PORT, function(err) {
+    getmac.getMac(function(err, mac_address) { 
+        
+        console.log('==> Server started at ' + config.LOCAL_API.BASE)
+        diskStore.set(HARDWARE_ID_KEY, mac_address);
+        
+        diskStore.get(HAS_LOGGED_IN_KEY, (err, hasLoggedIn) => {
+            //console.log('Login status: ', hasLoggedIn)
+            if (hasLoggedIn) { connectToServer(); }
         });
     });
+});
 
-app.listen( port, function( err ) {
-    if ( err ) {
-        throw err;
-    }
-    console.log( 'Cam server started @ http://localhost:' + port + '.' );
-    //tryToConnectToSignalingServer();
-} );
+/**
+* Web socket client
+*/
 
-module.exports = { 
-    app: app,
-    store: store,
-    httpClient: request,
-    checkAuth: checkAuth
-}; // for testing
+var counter = 0;
+
+function connectToServer() { 
+    counter++;
+    var timeout = 1000 * Math.pow(1.5, counter);
+    timeout = (timeout > MAX_TIMEOUT) ? MAX_TIMEOUT : timeout; 
+    setTimeout(connectWebSocket, timeout);
+}
+
+function connectWebSocket(callback) {    
+    var ws = new WS(SIGNALING_URL, {
+        perMessageDeflate: false
+    });
+    const mediaClient = new MediaClient();
+    const cam_handler = new CameraHandler(ws, mediaClient, diskStore);
+
+    ws.on(OPEN_KEY, (evt) => {
+        counter = 0;
+        cam_handler.onSessionOpen(evt);
+    });
+
+    ws.on(ERROR_KEY, (evt) => {
+        cam_handler.onSessionError(evt);
+        return connectToServer();
+    });
+
+    ws.on(CLOSE_KEY, (evt) => {
+        cam_handler.onSessionClose(evt);
+        return connectToServer();
+    });
+
+    ws.on(MESSAGE_KEY, (_msg, flags) => {
+        var msg = JSON.parse(_msg);
+        console.log('==> Cam message ID "' + msg.id + '".');
+        switch (msg.id) {
+        case CAM_REGISTER_KEY:
+            cam_handler.onRegister(msg);
+            break;
+        case CAM_MODE_KEY:
+            cam_handler.onModeChange(msg);
+            break;
+        case SDP_OFFER_KEY:
+            cam_handler.onOfferRequest(msg);
+            break;
+        case SDP_ANSWER_KEY:
+            cam_handler.onAnswer(msg);
+            break;
+        case START_STREAM_KEY:
+            cam_handler.onStartStream(msg);
+            break;
+        case STOP_STREAM_KEY:
+            cam_handler.onStopStream(msg);
+            break;
+        case ERROR_KEY:
+            cam_handler.onError(msg);
+            break
+        default:
+            break;    
+        }
+    });
+}

@@ -22,6 +22,8 @@
   "dependencies": {
     "bootstrap": "~3.3.0",
     "vue": "~2.2.1",
-    "jquery": "~3.1.1"
+    "jquery": "~3.1.1",
+    "kurento-utils": "master",
+    "adapter.js": "v0.2.9"
   }
 }

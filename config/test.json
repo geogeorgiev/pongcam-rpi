@@ -1,15 +1,19 @@
 {
   "LOCAL_STORAGE_DIR": "./local_storage",
   "APP_API": {
-    "base": "http://localhost:8000",
-    "cams": "/cams",
-    "auth": "/api-token-auth"
+    "BASE": "http://localhost:8000",
+    "CAMS": "/cams/",
+    "AUTH": "/api-token-auth/"
   },
   "LOCAL_API": {
-    "base": "http://localhost:8444",
-    "auth": "/auth"
+    "BASE": "http://localhost:8444",
+    "AUTH": "/auth",
+    "CAMS": "/cams",
+    "SECRET": "d5c48d1fa7354acf30ad0bdc4b24512e41a67167",
+    "RECONNECT_MAX_TIMEOUT": 300000
   },
   "SIGNALING_API": {
-    "base": "wss://localhost:8443/cam"
-  }
+    "BASE": "wss://localhost:8443/cam"
+  },
+  "VIDEO_STREAM_TYPE": "video_only_h264"
 }

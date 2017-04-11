@@ -26,25 +26,33 @@
   </header>
   <div class="container">
     <div id="app" class="row">
-      <form class="well col-sm-4 col-xs-12">
-        <div v-if="!isAuthed" class="form-group">
+      <div class="well col-sm-4 col-xs-12">
+        <p class="">{{ message }}</p>
+        <div v-if="!hasLoggedIn" class="form-group">
           <p class="">Please log in to enable the camera</p>
           <label for="username">Username:</label>
           <input v-model="username" type="text" name="username" class="form-control">
           <label for="password">Password:</label>
           <input v-model="password" type="password" name="password" class="form-control">
           <hr>
-          <a class="btn btn-primary" v-on:click="auth">Login</a>
+          <a class="btn btn-primary" v-on:click="logIn">Login</a>
         </div>
-        <div v-if="isAuthed">
-          <p>Logged in as: <i>{{ username }}</i></p>
-          <p>Cam: <i>{{ camName }}</i></p>
+        <div v-if="hasLoggedIn">
+          <p>Logged in as {{ username }}</p>
+          <div>
+            <h2>Camera</h2>
+              <label for="camName">Name:</label>
+              <input v-model="camName" type="text" name="camName" class="form-control">
+              <a style="margin-top: 10px;" class="btn btn-primary" v-on:click="submitCam">Submit</a>
+          </div>
+          
           <hr>
-          <a class="btn btn-danger" v-on:click="logout">Logout</a>
+          <a class="btn btn-danger" v-on:click="logOut">Logout</a>
         </div>
-      </form>
+      </div>
     </div>
   </div>
+  <script src="js/config.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

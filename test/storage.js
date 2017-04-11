@@ -1,7 +1,7 @@
 'use strict';
 process.env.NODE_ENV = 'test';
 const chai = require( 'chai' );
-const utils = require( '../libs/utils.js' );
+const utils = require( '../lib/utils.js' );
 const should = chai.should();
 const ls = require( 'node-localstorage' )
 const config = require('config');
@@ -22,8 +22,7 @@ describe( 'Utils', function() {
 /*
   * Test the /GET route
   */
-  describe( 'Get/set item in storage', function() {
-    
+  describe( 'Storage', function() {
     it( 'Check whether setItem and getItem work.', function( done ) {
       store.setItem( itemName, itemVal );
       store.getItem( itemName ).should.be.equal( itemVal );

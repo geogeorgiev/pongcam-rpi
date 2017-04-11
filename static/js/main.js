@@ -1,71 +1,150 @@
 console.log( "Baiivan cam app says hi!" );
- 
+
+const USERNAME_KEY = 'username';
+const PASSWORD_KEY = 'password';
+const HAS_LOGGED_IN_KEY = "hasLoggedIn"
+const CAM_KEY = 'cam';
+const USER_KEY = 'user';
+const TOKEN_KEY = 'token';
+const NAME_KEY = 'name';
+const ID_KEY = "id";
+
 var vm = new Vue( {
   el: '#app',
   data: {
+    message: '',
     username: '',
     password: '',
-    camName: 'Some cam',
-    baseUrl: 'http://localhost:8444',
-    isAuthed : false,
+    camName: '',
+    camId: null,
+    authUrl: config.BASE_URL + config.AUTH_URL,
+    camUrl: config.BASE_URL + config.CAM_URL,
+    hasLoggedIn : false,
   },
   created: function () {
-    this.checkAuth();
+    this._hasLoggedIn();
   },
   methods: {
-    auth: function() {
+    logIn: function() {
       var $this = this;
+      var userInfo = {}
+      userInfo[ USERNAME_KEY ] = this[ USERNAME_KEY ];
+      userInfo[ PASSWORD_KEY ] = this[ PASSWORD_KEY ];
+      var hasValidated = this._validate( userInfo );
+
+      if ( !hasValidated ) {
+        this.message = hasValidated[1]
+      }
       $.post( {
-        url : this.baseUrl + '/auth',
+        url: this.authUrl,
         data: {
           username: this.username,
-          password: this.password,
-          camName: this.camName,
+          password: this.password
         },
         success: function( res, status, obj ) {
-          console.log( 'Auth successfull.' );
+          $this.message = 'Login successful.';
+          console.log( '==> Login has been successfull.' );
           console.log( res );
-          $this.camName = res.cam.name;
-          $this.isAuthed = true;
+          $this.hasLoggedIn = true;
+          $this._getCam();
         },
         error: function( obj, status, err ) {
-          console.info( obj.responseText );
+          console.info( obj.error )
         }
       } );  
     },
-    logout: function() {
+    logOut: function() {
       var $this = this;
       $.ajax( {
         method: 'DELETE',
-        url: this.baseUrl + '/auth',
+        url: this.authUrl,
         success: function( res, status, obj ) {
-          console.log( 'Logout successful.' );
-          $this.isAuthed = false;
+          $this.message = 'Logout successful.';
+          console.log( '==> Logout has been successful.' );
+          $this.hasLoggedIn = false;
+          $this.camId = null;
+          $this.camName = null;
         },
         error: function( obj, status, err ) {
+          console.info( status )
           console.info( obj.responseText );
         }
-      } );  
+      });  
     },
-    checkAuth: function() {
-      console.log( 'Checking auth @ ' + this.baseUrl + '/is-authed.' );
+
+    submitCam: function() {
+      var $this = this;
+      this._postCam();
+    },
+
+    _hasLoggedIn: function() {
       var $this = this;
       $.get( {
-        url : this.baseUrl + '/auth',
+        url: this.authUrl,
         success: function( res, status, obj ) {
-          console.log( 'Checking auth is successful. Is authed: ' + res.is_authed + '.');
+          $this.message = ''; 
+          console.log( '==> Has logged in?: ')
           console.log( res );
-          if ( res.is_authed ) {
-            $this.username = res.user.username;
-            $this.camName = res.cam.name;
-            $this.isAuthed = res.is_authed;
+
+          $this[ USERNAME_KEY ] = res[ USER_KEY ][ USERNAME_KEY ];
+          $this[ HAS_LOGGED_IN_KEY ] = true;
+          $this._getCam();
+          
+        },
+        error: function( obj, status, err ) {
+          console.info( status )
+          console.info( obj.responseText );
+        }
+      });  
+    },
+
+    _postCam: function( method ) {
+      var $this = this;
+      $.ajax({
+        url: this.camUrl,
+        method: 'POST',
+        data: {
+          name: $this.camName,
+          id: $this.camId
+        },
+        success: function( res, status, obj ) {
+          console.log( status )
+          console.log( res )
+        },
+        error: function( obj, err, status ) {
+          console.info( status )
+          console.info( obj.responseText );
+        }
+      });
+    },
+
+    _getCam: function() {
+      var $this = this;
+      $.get( {
+        url: this.camUrl,
+        success: function( res, status, statusObj ) {
+          console.info( res )
+          let cam = res[ CAM_KEY ];
+          if ( cam && cam[ TOKEN_KEY ]) {
+
+            $this.camName = cam[ NAME_KEY ];
+            $this.camId = cam[ ID_KEY ];
+          } else {
+            $this.camName = "Some cam";
           }
         },
         error: function( obj, status, err ) {
+          console.info( status )
           console.info( obj.responseText );
         }
-      } );  
+      });
     },
+
+    _validate: function( userInfo ) {
+      if ( !userInfo[ USERNAME_KEY ] || userInfo[ USERNAME_KEY ].length < 1 ) return [ false, 'Invalid username.' ];
+      if ( !userInfo[ PASSWORD_KEY ] || userInfo[ PASSWORD_KEY ].length < 8 ) return [ false, 'Invalid password.' ];
+      return [ true, null ];
+    }
   }, 
 });
 
