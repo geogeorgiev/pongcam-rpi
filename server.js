@@ -41,7 +41,7 @@ const ERROR_KEY = 'error';
 const MESSAGE_KEY = 'message';
 const OPEN_KEY = 'open';
 
-const CAM_REGISTER_KEY = 'cam_register';
+const CAM_SESSION_KEY = 'cam_session';
 const CAM_MODE_KEY = 'cam_mode';
 const CAM_STATE_KEY = 'cam_state';
 
@@ -122,8 +122,9 @@ var counter = 0;
 
 function connectToServer() { 
     counter++;
-    var timeout = 1000 * Math.pow(1.5, counter);
-    timeout = (timeout > MAX_TIMEOUT) ? MAX_TIMEOUT : timeout; 
+    var timeout = 1000 * Math.pow(counter, 2);
+    timeout = (timeout > MAX_TIMEOUT) ? MAX_TIMEOUT : timeout;
+    console.log('Reconnecting after ' + Math.round(timeout / 1000) + 'sec.') 
     setTimeout(connectWebSocket, timeout);
 }
 
@@ -153,23 +154,23 @@ function connectWebSocket(callback) {
         var msg = JSON.parse(_msg);
         console.log('==> Cam message ID "' + msg.id + '".');
         switch (msg.id) {
-        case CAM_REGISTER_KEY:
-            cam_handler.onRegister(msg);
+        case CAM_SESSION_KEY:
+            cam_handler.onSessionReady(msg);
             break;
         case CAM_MODE_KEY:
-            cam_handler.onModeChange(msg);
+            cam_handler.onModeUpdate(msg);
             break;
         case SDP_OFFER_KEY:
-            cam_handler.onOfferRequest(msg);
+            cam_handler.onOffer(msg);
             break;
         case SDP_ANSWER_KEY:
             cam_handler.onAnswer(msg);
             break;
         case START_STREAM_KEY:
-            cam_handler.onStartStream(msg);
+            cam_handler.onStartCam(msg);
             break;
         case STOP_STREAM_KEY:
-            cam_handler.onStopStream(msg);
+            cam_handler.onStopCam(msg);
             break;
         case ERROR_KEY:
             cam_handler.onError(msg);
