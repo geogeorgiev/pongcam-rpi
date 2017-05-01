@@ -1,0 +1,34 @@
+{
+  "name": "baiivan-cam",
+  "version": "0.2.0",
+  "description": "A camera server app which auths and streams live video.",
+  "private": true,
+  "author": "Georgy St. Georgiev",
+  "main": "server.js",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "^1.16.1",
+    "config": "^1.25.1",
+    "debug": "^2.6.6",
+    "express": "~4.12.4",
+    "getmac": "^1.2.1",
+    "node-localstorage": "^1.3.0",
+    "request": "^2.79.0",
+    "terminate": "^2.1.0",
+    "uuid": "^3.0.1",
+    "ws": "~1.0.1"
+  },
+  "devDependencies": {
+    "bower": "^1.4.1",
+    "chai": "^3.5.0",
+    "chai-http": "^3.0.0",
+    "mocha": "^3.2.0",
+    "nodemon": "^1.11.0",
+    "sinon": "^1.17.7"
+  },
+  "scripts": {
+    "start": "nodemon -L server.js",
+    "test": "mocha --timeout 4000",
+    "postinstall": "cd static && bower install"
+  }
+}

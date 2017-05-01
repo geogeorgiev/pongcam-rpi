@@ -1,0 +1,25 @@
+FROM gooshan/gstreamer
+
+ARG VER=6.10.2
+ENV ARCHIVE=node-v${VER}-linux-x64
+WORKDIR /tmp
+RUN wget -qO- https://nodejs.org/dist/v${VER}/${ARCHIVE}.tar.xz | tar xvJ 
+RUN ln -s /tmp/${ARCHIVE}/bin/node /usr/local/bin/node && \
+ln -s /tmp/${ARCHIVE}/bin/npm /usr/local/bin/npm
+
+RUN npm install nodemon -g
+
+RUN mkdir /data
+ADD app/package.json /data/package.json
+WORKDIR /data
+RUN npm install
+ENV NODE_PATH /data/node_modules
+
+RUN mkdir /src
+ADD app/nodemon.json /src/nodemon.json
+WORKDIR /src
+
+EXPOSE 8444
+
+
+

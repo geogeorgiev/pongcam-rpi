@@ -1,0 +1,10 @@
+version: '3'
+services:
+  cam:
+    build: ./
+    container_name: cm01
+    command: npm start
+    ports:
+      - "8444:8444"
+    volumes:
+      - "./app:/src"
