@@ -33,13 +33,20 @@ const TOKEN_KEY = 'token';
 const CAM_TYPE = 'cam_type';
 const CAM_TYPE_RTP = 'RTP';
 
+const MEDIA_STATE_KEY = 'media_state';
+const MEDIA_FLOW_KEY = 'media_flow';
+
+const child = require('child_process');
+
 class CameraHandler {
 
-    constructor (ws, client, store) {
+    constructor (ws, client, store, cam) {
         this.ws = ws;
         this.mediaClient = client;
         this.store = store;
         this.session = {};
+        this.session.mode = cam.mode;
+        this.session.camToken = cam.token;
         this.session.state = CAM_STATE_OFF;
     }
 
@@ -47,14 +54,14 @@ class CameraHandler {
     // Session handlers
     //
 
-    onSessionOpen(msg) {
+    onSessionOpen(evt) {
         var $this = this;
         return this.store.get(CAM_KEY, onGet);
         
         function onGet(err, cam) {
             if (err || !cam[TOKEN_KEY]) return $this._sendError(err, 500);
-            $this.session.camToken = cam[TOKEN_KEY];
-            $this.session.mode = cam.mode;
+            //$this.session.camToken = cam[TOKEN_KEY];
+            //$this.session.mode = cam.mode;
             $this.session.state = CAM_STATE_READY;
 
             console.log('==> Cam mode: ' + cam.mode);
@@ -82,8 +89,15 @@ class CameraHandler {
         return this.mediaClient.stopStream(this.session, onStopStream)
         function onStopStream(err) {
             if (err) console.error(err);
+            console.log('==> Killing all gst-stream processes.');
+            const cmd = '/usr/bin/pkill';
+            var proc = child.spawn(cmd, ['-f', 'gst-launch'], { detached: false });
+
             return $this.session.state = CAM_STATE_OFF;
+        
         }
+
+
     }
 
     onSessionError(evt) {
@@ -123,7 +137,7 @@ class CameraHandler {
             return $this._send(res);
         });*/
 
-        var res = {id: CAM_START_STREAM_KEY}
+        var res = { id: CAM_START_STREAM_KEY }
         res[CAM_MODE_KEY] = $this.session.mode;
         res[STREAM_ID_KEY] = $this.session.camToken;
         return $this._send(res);
@@ -151,7 +165,7 @@ class CameraHandler {
             cam.mode = camMode;
             $this.store.set(CAM_KEY, cam);
 
-            var res = {id: CAM_MODE_KEY}
+            var res = { id: CAM_MODE_KEY }
             res[CAM_MODE_KEY] = camMode;
             res[STREAM_ID_KEY] = $this.session.camToken;
             return $this._send(res);
@@ -169,7 +183,7 @@ class CameraHandler {
         function onOffer(err, offer) {
             if (err) return $this._sendError(err, 500);  
             
-            var res = {id : CAM_SDP_OFFER_KEY};
+            var res = { id: CAM_SDP_OFFER_KEY };
             res[STREAM_ID_KEY] = $this.session.camToken;
             res[SDP_OFFER_KEY] = offer;
             res[CAM_TYPE] = CAM_TYPE_RTP;
@@ -192,7 +206,7 @@ class CameraHandler {
             $this.session.host = connCreds[HOST_KEY];
             $this.session.port = connCreds[PORT_KEY];
             
-            var res = {id : CAM_SDP_ANSWER_KEY};
+            var res = { id: CAM_SDP_ANSWER_KEY };
             res[STREAM_ID_KEY] = $this.session.camToken;
             $this._send(res);
             
@@ -224,7 +238,7 @@ class CameraHandler {
         return this._turnOff(onTurnOff);
         function onTurnOff(err) {
             if (err) return $this._sendError(err, 500); 
-            var res = {id : CAM_STATE_KEY};
+            var res = { id : CAM_STATE_KEY };
             res[STREAM_ID_KEY] = $this.session.camToken;
             res[CAM_STATE_KEY] = $this.session.state;
             return $this._send(res);
@@ -260,6 +274,16 @@ class CameraHandler {
             $this.session.state = CAM_STATE_READY;
             return callback(null);
         }
+    }
+
+    onMediaFlow(msg) {
+        var mediaFlow = msg[MEDIA_FLOW_KEY];
+         console.log('==> Media flow: ', mediaFlow);
+    }
+
+    onMediaState(msg) {
+        var mediaState = msg[MEDIA_STATE_KEY];
+        console.log('==> Media state: ', mediaState);
     }
 
     _sendError(err, code) {

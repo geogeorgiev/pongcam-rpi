@@ -19,10 +19,10 @@ class DiskStore {
     get( key, callback ) {
         if ( !key ) return callback( 'missing key arg' );
         let item = this.storage.getItem( key );
-        return callback( null, JSON.parse( item ) );
+        return callback( null, item );
     }
     set( key, value ) {
-        let val = JSON.stringify( value );
+        let val =  value //JSON.stringify( value );
         if ( !key || !val ) return 1;
         this.storage.setItem( key, val );
         return 0;

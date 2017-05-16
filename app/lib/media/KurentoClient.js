@@ -69,6 +69,11 @@ class KurentoClient {
     opts[HOST_KEY] = session[HOST_KEY];
     opts[PORT_KEY] = session[PORT_KEY];
     console.log('Opts are ', opts)
+
+    if (session.streamProc) {
+      session.streamProc.kill('SIGINT');
+      session.streamProc = null;
+    }
     session.streamProc = this._spawnGstreamer(opts);
     return callback(null);
   }

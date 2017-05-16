@@ -2,8 +2,7 @@
   "LOCAL_STORAGE_DIR": "./dev__local_storage",
   "APP_API": {
     "BASE": "http://localhost:8000",
-    "CAMS": "/cams/",
-    "AUTH": "/api-token-auth/"
+    "CAMS": "/cams/activation/"
   },
   "LOCAL_API": {
     "BASE": "http://0.0.0.0:8444",
@@ -15,5 +14,5 @@
   "SIGNALING_API": {
     "BASE": "wss://localhost:8443/cam"
   },
-  "VIDEO_STREAM_TYPE": "video_only_h264_test"
+  "VIDEO_STREAM_TYPE": "video_only_h264"
 }
