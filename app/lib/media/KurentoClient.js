@@ -17,8 +17,6 @@ const terminate = require('terminate');
 
 // Constants
 const SDP_ANSWER_KEY = 'sdp_answer';
-const PORT_KEY = 'port';
-const HOST_KEY = 'host';
 const VIDEO_STREAM_TYPE_KEY = 'video_type';
 const VIDEO_ONLY_VP8 = 'video_only_vp8';
 const VIDEO_ONLY_H264 = 'video_only_h264';
@@ -59,15 +57,15 @@ class KurentoClient {
 
   startStream(session, callback) {   
     console.log('Setting opts')
-    if (!session[HOST_KEY] || !session[PORT_KEY]) {
+    if (!session.streamHost || !session.streamPort ) {
       return callback('No host or port provided.')
     }
 
     console.log('Setting opts2')
     var opts = {};
     opts[VIDEO_STREAM_TYPE_KEY] = config.VIDEO_STREAM_TYPE;
-    opts[HOST_KEY] = session[HOST_KEY];
-    opts[PORT_KEY] = session[PORT_KEY];
+    opts.host = session.streamHost;
+    opts.port = session.streamPort;
     console.log('Opts are ', opts)
 
     if (session.streamProc) {

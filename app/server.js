@@ -34,8 +34,8 @@ const CAM_STOP_KEY = 'cam_stop';
 
 const SDP_OFFER_KEY = 'sdp_offer';
 const SDP_ANSWER_KEY = 'sdp_answer';
-const START_STREAM_KEY = 'start_stream';
-const STOP_STREAM_KEY = 'stop_stream';
+const STREAM_START_KEY = 'stream_start';
+const STREAM_STOP_KEY = 'stream_stop';
 const STREAM_ID_KEY = 'stream_token';
 const START_SESSION_KEY = 'start_session';
 const SESSION_ID_KEY = 'session_id';
@@ -95,19 +95,27 @@ function connectWebsocket(cam) {
     
     var ws = new WS(SIGNALING_URL, {
         perMessageDeflate: false,
-        headers: { 'X-Auth-Token': cam.token }
+        headers: { 'X-Cam-Token': cam.token }
     });
 
     const mediaClient = new MediaClient();
-    const cam_handler = new CameraHandler(ws, mediaClient, diskStore, cam);
+
+    const args = {
+        ws: ws, 
+        mediaClient: mediaClient, 
+        diskStore: diskStore, 
+        cam: cam
+    }
+
+    const camHandler = new CameraHandler(args);
 
     ws.on(OPEN_KEY, (evt) => {
         counter = 0;
-        cam_handler.onSessionOpen(evt);
+        camHandler.onSessionOpen(SIGNALING_URL);
     });
 
     ws.on(ERROR_KEY, (err) => {
-        cam_handler.onSessionError(err);
+        camHandler.onSessionError(err);
         if(err.code === 'ECONNREFUSED') {
             attempWebsocketConn(cam);
         }
@@ -115,7 +123,7 @@ function connectWebsocket(cam) {
     });
 
     ws.on(CLOSE_KEY, (evt) => {
-        cam_handler.onSessionClose(evt);
+        camHandler.onSessionClose(evt);
         return attempWebsocketConn(cam);
     });
 
@@ -124,40 +132,40 @@ function connectWebsocket(cam) {
         console.log('==> Cam message ID "' + msg.id + '".');
         switch (msg.id) {
         
-        case CAM_SESSION_KEY:
-            cam_handler.onSessionReady(msg);
+        /*case CAM_SESSION_KEY:
+            camHandler.onSessionReady(msg);
             break;
         
-        case START_STREAM_KEY:
-            cam_handler.onStreamStart(msg);
-            break;
-        
-        case SDP_OFFER_KEY:
-            cam_handler.onOffer(msg);
-            break;
-        
-        case SDP_ANSWER_KEY:
-            cam_handler.onAnswer(msg);
-            break;
-        
-        case STOP_STREAM_KEY:
-            cam_handler.onStreamStop(msg);
-            break;
-
         case CAM_MODE_KEY:
-            cam_handler.onModeUpdate(msg);
+            camHandler.onModeUpdate(msg);
+            break;        
+        case SDP_OFFER_KEY:
+            camHandler.onOffer(msg);
+            break;
+        */
+
+        case STREAM_START_KEY:
+            camHandler.onStreamStart(msg);
             break;
 
+        case SDP_ANSWER_KEY:
+            camHandler.onSdpAnswer(msg);
+            break;
+        
+        case STREAM_STOP_KEY:
+            camHandler.onStreamStop(msg);
+            break;
+        
         case MEDIA_FLOW_KEY:
-            cam_handler.onMediaFlow(msg);
+            camHandler.onMediaFlow(msg);
             break;
         
         case MEDIA_STATE_KEY:
-            cam_handler.onMediaState(msg);
+            camHandler.onMediaState(msg);
             break;
 
         case ERROR_KEY:
-            cam_handler.onError(msg);
+            camHandler.onError(msg);
             break
             
         default:
