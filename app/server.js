@@ -81,7 +81,7 @@ if (ENV === 'dev') {
 
 var counter = 0;
 
-function attempWebsocketConn(cam) { 
+function attemptWebsocketConn(cam) { 
     
     counter++;
     var timeout = 1000 * Math.pow(counter, 2);
@@ -117,14 +117,14 @@ function connectWebsocket(cam) {
     ws.on(ERROR_KEY, (err) => {
         camHandler.onSessionError(err);
         if(err.code === 'ECONNREFUSED') {
-            attempWebsocketConn(cam);
+            attemptWebsocketConn(cam);
         }
         
     });
 
     ws.on(CLOSE_KEY, (evt) => {
         camHandler.onSessionClose(evt);
-        return attempWebsocketConn(cam);
+        return attemptWebsocketConn(cam);
     });
 
     ws.on(MESSAGE_KEY, (_msg, flags) => {
@@ -212,7 +212,7 @@ function auth(){
         
         //diskStore.set(CAM_MODE_KEY, data[CAM_MODE_KEY]);
         
-        return attempWebsocketConn(cam);
+        return attemptWebsocketConn(cam);
     }
 }
 
@@ -221,10 +221,10 @@ function initCam() {
     function onDiskGet(err, cam) {
         if (err) return console.error(err);
         if (!cam) return auth();
-        cam = JSON.parse(cam) 
+        var cam = JSON.parse(cam) 
         if (!cam.token) return auth(); 
 
-        return attempWebsocketConn(cam);
+        return attemptWebsocketConn(cam);
     }
 }
 

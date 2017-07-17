@@ -14,6 +14,7 @@ const getmac = require('getmac');
 const config = require('config');
 const child = require('child_process');
 const terminate = require('terminate');
+const logger = console;
 
 // Constants
 const SDP_ANSWER_KEY = 'sdp_answer';
@@ -72,7 +73,10 @@ class KurentoClient {
       session.streamProc.kill('SIGINT');
       session.streamProc = null;
     }
+    
+    //console.log('Debuging: stopped actual spawning.')
     session.streamProc = this._spawnGstreamer(opts);
+    
     return callback(null);
   }
 

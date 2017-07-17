@@ -10,6 +10,8 @@
 const LIB_PATH = '../../lib';
 const ENV = process.env.NODE_ENV
 
+
+
 const CAM_START_STREAM_KEY = 'cam_start_stream';
 const CAM_SDP_OFFER_KEY = 'cam_sdp_offer';
 const CAM_SDP_ANSWER_KEY = 'cam_sdp_answer';
@@ -41,7 +43,7 @@ const logger = console;
 
 class CameraHandler {
 
-    constructor (args) {
+    constructor(args) {
         this.ws = args.ws;
         this.mediaClient = args.mediaClient;
         this.store = args.store;
@@ -117,7 +119,7 @@ class CameraHandler {
         }
     }
 
-    _turnOn(callback){
+    _turnOn(callback) {
         var $this = this;
         console.log('==> Start with state ', this.camState);
         // if cam is ON, return - it's on already.
@@ -132,7 +134,7 @@ class CameraHandler {
         }
     }
 
-    _turnOff(callback){
+    _turnOff(callback) {
         var $this = this;
         console.log('==> Stop with state ', this.camState);
         
@@ -157,9 +159,9 @@ class CameraHandler {
         return this.mediaClient.stopStream(this, onStopStream)
         function onStopStream(err) {
             if (err) console.error(err);
-            console.log('==> Killing all gst-stream processes.');
-            const cmd = '/usr/bin/pkill';
-            var proc = child.spawn(cmd, ['-f', 'gst-launch'], { detached: false });
+            //console.log('==> Killing all gst-stream processes.');
+            //const cmd = '/usr/bin/pkill';
+            //var proc = child.spawn(cmd, ['-f', 'gst-launch'], { detached: false });
             return $this.camState = CAM_STATE_OFF;
         }
     }
@@ -191,7 +193,7 @@ class CameraHandler {
         return this._send({id: 'error', error: err, code: code});
     }
 
-    _send(msg, _conn){
+    _send(msg, _conn) {
         var conn = _conn || this.ws;
         if (conn && conn.readyState == 1) {
             conn.send(JSON.stringify(msg));
