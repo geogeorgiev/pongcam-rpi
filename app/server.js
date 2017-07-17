@@ -6,7 +6,11 @@
 
 'use strict';
 
-// Libs.
+const ENV = process.env.NODE_ENV;
+if (ENV === 'dev') {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // Ignore warning for self-signed certificates
+}
+
 const LIB_PATH = './lib';
 const os = require('os');
 const path = require('path');
@@ -16,76 +20,41 @@ const bodyParser = require('body-parser');
 const WS = require('ws');
 const http = require('http');
 const config = require('config');
-const request = require('request');
+const request = require('request')
 const getmac = require('getmac');
+const jsonfile = require('jsonfile')
 
 const MediaClient = require(LIB_PATH + '/media/KurentoClient');
-
-const InMemoryStore = require(LIB_PATH + '/db/InMemoryDB');
 const DiskStore = require(LIB_PATH + '/store/DiskStore');
+//const CameraHandler = require(LIB_PATH + '/handler/CameraHandler');
+//const AppHandler = require(LIB_PATH + '/handler/AppHandler');
 
-const CameraHandler = require(LIB_PATH + '/handler/CameraHandler');
-const AppHandler = require(LIB_PATH + '/handler/AppHandler');
+const d = require('./definitions')
+const credsFile = './config/credentials.json'
+const creds = jsonfile.readFileSync(credsFile)
+const logger = require(LIB_PATH + '/logger');
+const OAuthService = require(LIB_PATH + '/http/OAuthService');
+const auth = new OAuthService(request)
 
-// Constants
+const CamService = require(LIB_PATH + '/http/CamService');
+const cam = new CamService(request)
 
-const CAM_START_KEY = 'cam_start';
-const CAM_STOP_KEY = 'cam_stop';
-
-const SDP_OFFER_KEY = 'sdp_offer';
-const SDP_ANSWER_KEY = 'sdp_answer';
-const STREAM_START_KEY = 'stream_start';
-const STREAM_STOP_KEY = 'stream_stop';
-const STREAM_ID_KEY = 'stream_token';
-const START_SESSION_KEY = 'start_session';
-const SESSION_ID_KEY = 'session_id';
-const CLOSE_KEY = 'close';
-const ERROR_KEY = 'error';
-const MESSAGE_KEY = 'message';
-const OPEN_KEY = 'open';
-
-const MEDIA_STATE_KEY = 'media_state';
-const MEDIA_FLOW_KEY = 'media_flow';
-const CAM_SESSION_KEY = 'cam_session';
-const CAM_MODE_KEY = 'cam_mode';
-const CAM_STATE_KEY = 'cam_state';
-
-const CAM_TOKEN_KEY = 'cam_token';
-const USER_TOKEN_KEY = 'user_token';
-const HAS_LOGGED_IN_KEY = 'has_logged_in';
-const HARDWARE_ID_KEY = 'hardware_id';
-const CAM_CODE_KEY = 'cam_code';
-const CAM_KEY = "cam";
-
-const ENV = process.env.NODE_ENV;
-
-const APP_URL = config.APP_API.BASE;
-const AUTH_URL = APP_URL + config.APP_API.AUTH;
-const CAM_URL = APP_URL + config.APP_API.CAMS;
-
-const SIGNALING_URL = config.SIGNALING_API.BASE// + '?apiKey=blahblah'
+const APP_URL = config.APP.URL;
+const SIG_URL = config.SIGNALING.URL
 const MAX_TIMEOUT = config.RECONNECT_MAX_TIMEOUT;
 
-// Instances
-const diskStore = new DiskStore(config.LOCAL_STORAGE_DIR + "/" + ENV);
-const localUrlParsed = url.parse(config.LOCAL_API.BASE);
-const PORT = localUrlParsed.port;
-
-if (ENV === 'dev') {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // Ignore warning for self-signed certificates
-}
 
 /**
 * Web socket client
 */
 
 var counter = 0;
-
+/*
 function attemptWebsocketConn(cam) { 
     
     counter++;
     var timeout = 1000 * Math.pow(counter, 2);
-    timeout = (timeout > MAX_TIMEOUT) ? MAX_TIMEOUT : timeout;
+    timeout = (timeout > SIGNALING_RECON_MTO) ? SIGNALING_RECON_MTO : timeout;
     console.log('Reconnecting after ' + Math.round(timeout / 1000) + 'sec.') 
     setTimeout(() => {
         connectWebsocket(cam) }, timeout);
@@ -95,26 +64,24 @@ function connectWebsocket(cam) {
     
     var ws = new WS(SIGNALING_URL, {
         perMessageDeflate: false,
-        headers: { 'X-Cam-Token': cam.token }
+        headers: { 'Authorization': 'Bearer ' + config.ACCESS_TOKEN }
     });
-
-    const mediaClient = new MediaClient();
 
     const args = {
         ws: ws, 
-        mediaClient: mediaClient, 
-        diskStore: diskStore, 
+        mediaClient: new MediaClient(), 
+        diskStore: new DiskStore(config.STORAGE_DIR + "/" + ENV), 
         cam: cam
     }
 
     const camHandler = new CameraHandler(args);
 
-    ws.on(OPEN_KEY, (evt) => {
+    ws.on('open', (evt) => {
         counter = 0;
         camHandler.onSessionOpen(SIGNALING_URL);
     });
 
-    ws.on(ERROR_KEY, (err) => {
+    ws.on('error', (err) => {
         camHandler.onSessionError(err);
         if(err.code === 'ECONNREFUSED') {
             attemptWebsocketConn(cam);
@@ -122,49 +89,36 @@ function connectWebsocket(cam) {
         
     });
 
-    ws.on(CLOSE_KEY, (evt) => {
+    ws.on('close', (evt) => {
         camHandler.onSessionClose(evt);
         return attemptWebsocketConn(cam);
     });
 
-    ws.on(MESSAGE_KEY, (_msg, flags) => {
+    ws.on('message', (_msg, flags) => {
         var msg = JSON.parse(_msg);
         console.log('==> Cam message ID "' + msg.id + '".');
         switch (msg.id) {
-        
-        /*case CAM_SESSION_KEY:
-            camHandler.onSessionReady(msg);
-            break;
-        
-        case CAM_MODE_KEY:
-            camHandler.onModeUpdate(msg);
-            break;        
-        case SDP_OFFER_KEY:
-            camHandler.onOffer(msg);
-            break;
-        */
-
-        case STREAM_START_KEY:
+        case d.STREAM_START:
             camHandler.onStreamStart(msg);
             break;
 
-        case SDP_ANSWER_KEY:
+        case d.SDP_ANSWER:
             camHandler.onSdpAnswer(msg);
             break;
         
-        case STREAM_STOP_KEY:
+        case d.STREAM_STOP:
             camHandler.onStreamStop(msg);
             break;
         
-        case MEDIA_FLOW_KEY:
+        case d.MEDIA_FLOW:
             camHandler.onMediaFlow(msg);
             break;
         
-        case MEDIA_STATE_KEY:
+        case d.MEDIA_STATE:
             camHandler.onMediaState(msg);
             break;
 
-        case ERROR_KEY:
+        case d.ERROR:
             camHandler.onError(msg);
             break
             
@@ -173,10 +127,12 @@ function connectWebsocket(cam) {
         }
     });
 }
-
+*/
 /**
 * Init process
 */
+
+/*
 function auth(){
     var hardwareId = null;
     getmac.getMac(onAddress); 
@@ -214,21 +170,85 @@ function auth(){
         
         return attemptWebsocketConn(cam);
     }
+}*/
+
+
+var initCount = 0
+
+
+function initAgain() {
+    
+    initCount++;
+    
+    var timeout = 1000 * Math.pow(initCount, 4);
+    timeout = (timeout > MAX_TIMEOUT) ? MAX_TIMEOUT : timeout;
+    
+    if (initCount > 10) return logger.error('Max reconnect tries. Verification impossible. Please check the config fiels.')
+    console.log('Init again after ' + Math.round(timeout / 1000) + 'sec.') 
+    
+    setTimeout(init, timeout)
 }
 
-function initCam() {
-    diskStore.get(CAM_KEY, onDiskGet);
-    function onDiskGet(err, cam) {
-        if (err) return console.error(err);
-        if (!cam) return auth();
-        var cam = JSON.parse(cam) 
-        if (!cam.token) return auth(); 
 
-        return attemptWebsocketConn(cam);
+function init() {
+
+    logger.info('Initing')
+    
+    auth.verifyToken(APP_URL + 'cams/creds/', creds, onVerify)
+
+    function onVerify(err, res, data) {
+
+        if (err)  return logger.info(err)//initAgain()
+
+        logger.info(res.statusCode)
+        if (res.statusCode === 403 || res.statusCode === 401) {
+
+            return auth.refreshToken(
+                APP_URL + 'cams/creds/create/', 
+                creds, 
+                onRefresh
+            )
+
+        } else {
+            //creds.CAM_ID = data.cam
+            jsonfile.writeFileSync(credsFile, creds, {spaces: 2})
+            logger.info('Ready for action :)', data)
+            /*cam.list(APP_URL + 'cams/services/', creds, (err, res, body) => {
+                if (err) logger.error(err)
+
+                logger.info(body)
+
+            })*/
+        }
     }
+
+
+    function onRefresh(err, res, data) {
+
+        if (err) return logger.error(err)
+
+        if (data) {
+            logger.info(data)
+            creds.ACCESS_TOKEN = data.access_token
+            creds.REFRESH_TOKEN = data.refresh_token
+            jsonfile.writeFileSync(credsFile, creds, {spaces: 2})
+        } else {
+            logger.warn('Empty data on refresh.')
+        }
+
+        logger.info('Ready for action')
+
+   
+    }
+    
 }
 
-initCam();
+
+init();
+
+
+
+                
 
 
 /**
