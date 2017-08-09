@@ -1,4 +1,4 @@
-
+const logger = console
 
 module.exports = function AuthService(request) {
 	
@@ -7,7 +7,6 @@ module.exports = function AuthService(request) {
 
 	this.verifyToken = function (url, creds, callback) {
 	    
-	    console.log(creds.ACCESS_TOKEN)
 	    this.request.get({ 
 	        url: url,
 	        json: true,
@@ -18,7 +17,6 @@ module.exports = function AuthService(request) {
 	        if (err) return callback(err)
 
 			if (res.statusCode === 200) {
-				console.info(res.body)
 	       		return callback(null, res, body)
 			}
 
@@ -32,13 +30,11 @@ module.exports = function AuthService(request) {
 
 
 	this.refreshToken = function(url, creds, callback) {
-		console.log('Refresh')
-
+	
 	    this.request.post({ 
 	        url: url,
 	        json: true,
 	        body: { 
-	            grant_type: 'refresh_token', 
 	            refresh_token: creds.REFRESH_TOKEN 
 	        },
 	        auth: {
@@ -48,7 +44,7 @@ module.exports = function AuthService(request) {
 	    }, onRequest);
 
 	    function onRequest(err, res, body) {
-
+	    
 	    	if (err) return callback(err)
 	    	
 	    	if (res.statusCode !== 200) {
@@ -60,17 +56,12 @@ module.exports = function AuthService(request) {
 	}
 
 
+	this.get = function(url, creds, callback) {
 
-
-	this.list = function(url, creds, callback) {
-		console.info('Listing cams')
 		this.request.get({ 
 	        url: url,
 	        json: true,
-	        
-	        headers: {
-	        	'Authorization': 'Bearer ' + creds.ACCESS_TOKEN
-	        }
+	        headers: { 'Authorization': 'Bearer ' + creds.ACCESS_TOKEN }
 	    }, callback);
 
 	}

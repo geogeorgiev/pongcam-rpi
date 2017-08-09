@@ -1,0 +1,7 @@
+{
+  "STORAGE_DIR": "./local_storage",
+  "APP_URL": "http://stage.vnm.io:8000/",
+  "SIGNALING_URL": "wss://stage.vnm.io:8440/cams/",
+  "RECONNECT_MAX_TIMEOUT": 60000, 
+  "VIDEO_STREAM_TYPE": "video_only_h264"
+}

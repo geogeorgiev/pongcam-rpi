@@ -23,7 +23,9 @@ const VIDEO_ONLY_VP8 = 'video_only_vp8';
 const VIDEO_ONLY_H264 = 'video_only_h264';
 const VIDEO_ONLY_H264_TEST = 'video_only_h264_test';
 
+
 class KurentoClient { 
+
 
   generateOffer(callback) {
     const sdpOffer = 
@@ -40,13 +42,13 @@ class KurentoClient {
     return callback(null, sdpOffer);
   }
 
-  generateStreamId(cam_token) {
-    return cam_token + ':' + '0' + ':' + 'src' + ':' + 'RtpEndpoint';
-  }
+
+  //generateStreamId(cam_token) {
+  //  return cam_token + ':' + '0' + ':' + 'src' + ':' + 'RtpEndpoint';
+  //}
   
   processAnswer(sdpAnswer, callback) {
-    //console.log(sdpAnswer)
-    var res = this._parseSdp(sdpAnswer);
+    var res = this.parseSdp(sdpAnswer);
     var host = res[0];
     var port = res[1];
     if (!host || !port) {
@@ -57,12 +59,12 @@ class KurentoClient {
 
 
   startStream(session, callback) {   
-    console.log('Setting opts')
+
     if (!session.streamHost || !session.streamPort ) {
       return callback('No host or port provided.')
     }
+    logger.info(session)
 
-    console.log('Setting opts2')
     var opts = {};
     opts[VIDEO_STREAM_TYPE_KEY] = config.VIDEO_STREAM_TYPE;
     opts.host = session.streamHost;
@@ -75,16 +77,18 @@ class KurentoClient {
     }
     
     //console.log('Debuging: stopped actual spawning.')
-    session.streamProc = this._spawnGstreamer(opts);
+    session.streamProc = this.spawnGstreamer(opts);
     
     return callback(null);
   }
 
+
   stopStream(session, callback) {
-    this._killProcess(session.streamProc, callback);
+    this.killProcess(session.streamProc, callback);
   } 
 
-  _parseSdp(sdp){
+
+  parseSdp(sdp){
     var arr = sdp.split('\n');
     if (arr.length < 5) {
       return [null, null];
@@ -95,19 +99,17 @@ class KurentoClient {
     return [host, port]
   }
 
-  _spawnGstreamer(opts) {
+
+  spawnGstreamer(opts) {
   
       var src = null;
       var encoding = null;
       var args = null;
-      
 
 
       console.log('Host ', opts.host)
       console.log('Port ' + opts.port)
       
-
-
       var videoconvert = ['!', 'queue', '!', 'videorate',
           '!', 'videoconvert', '!', 'videoscale', '!', 
           'video/x-raw,width=640,height=480,framerate=30/1']
@@ -154,7 +156,8 @@ class KurentoClient {
       return proc;
   }
 
-  _killProcess(proc, callback) {
+
+  killProcess(proc, callback) {
     
     if (!proc) {
       return callback ('No gstreamer process to kill.');
