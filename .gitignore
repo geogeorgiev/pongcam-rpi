@@ -63,7 +63,7 @@ typings/
 dev__*
 
 # Configs
-pongcam/config/*
+app/config/*
 
 
 # Exclusions

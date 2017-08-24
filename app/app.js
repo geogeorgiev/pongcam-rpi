@@ -27,13 +27,11 @@ const jsonfile = require('jsonfile')
 const OAuthService = require(LIB + 'OAuthService')
 const auth = new OAuthService(request)
 
-const APP_URL = ((config.server.ssl) ? 'https' : 'http') + '://' + 
-    config.server.domain
+const APP_URL = config.server.rest_url
 const CAM_REFRESH_URL = APP_URL + config.cam_api.refresh_creds
 const CAM_SERVICES_URL = APP_URL + config.cam_api.services
 const CAM_VERIFY_URL = APP_URL + config.cam_api.verify_creds
-const SIG_URL = ((config.server.ssl) ? 'wss' : 'ws') + '://' + 
-    config.server.domain + config.server.signaling_path
+const SIG_URL = config.server.signaling_url
 const MAX_TIMEOUT = config.server.reconnect_max_timeout
 
 const credsFile = 'config/credentials.json'
@@ -64,8 +62,8 @@ function attemptWebsocketConn(cam) {
 
 
 function connectWebsocket(cam) {    
-       
-    logger.debug('Ready, steady ...')
+    
+    logger.debug('Connecting @' + SIG_URL +'. Ready, steady ...')
     
     const ws = new WebSocket(SIG_URL, {
         perMessageDeflate: false,
@@ -174,7 +172,7 @@ function init() {
 
         jsonfile.writeFileSync(credsFile, creds, {spaces: 2})
 
-        const camDetailUrl = CAMS_URL + data.cam + '/'
+        const camDetailUrl = CAM_SERVICES_URL + data.cam + '/'
         
         auth.get(camDetailUrl, creds, (err, res, cam) => {
 
