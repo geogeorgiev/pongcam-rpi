@@ -1,0 +1,21 @@
+{
+    "server" : {
+      "ssl": true,
+      "domain": "example.com",
+      "ip": "192.168.1.1",
+      "signaling_path": "/signaling-cams/socket/",
+      "reconnect_max_timeout": 60000
+    },
+    "cam_api": {
+      "services": "/cams/services/",
+      "verify_creds": "/cams/creds/verify/",
+      "refresh_creds": "/cams/creds/refresh/"
+    },
+    "video": {
+      "src": "v4l2",
+      "encoding": "h264",
+      "width": 320,
+      "height": 240,
+      "framerate": "15/1"
+  }
+}

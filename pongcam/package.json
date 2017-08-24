@@ -1,0 +1,28 @@
+{
+  "name": "pongcam-rpi",
+  "version": "0.2.0",
+  "description": "Pongcam RPI: A raspbery pi camera software.",
+  "private": true,
+  "author": "Georgy Stefanov Georgiev - Gooshan",
+  "main": "app.js",
+  "license": "GNU GPLv3",
+  "dependencies": {
+    "config": "^1.25.1",
+    "express": "~4.12.4",
+    "jsonfile": "^3.0.1",
+    "request": "^2.79.0",
+    "winston": "^2.3.1",
+    "ws": "~1.0.1"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "chai-http": "^3.0.0",
+    "mocha": "^3.2.0",
+    "nodemon": "^1.11.0",
+    "sinon": "^1.17.7"
+  },
+  "scripts": {
+    "start": "nodemon -L --ignore '*.json' app.js",
+    "test": "mocha --timeout 4000"
+  }
+}

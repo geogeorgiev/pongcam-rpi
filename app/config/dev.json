@@ -1,7 +1,0 @@
-{
-  "STORAGE_DIR": "./dev__local_storage",
-  "APP_URL": "http://0.0.0.0:8000/",
-  "SIGNALING_URL": "wss://0.0.0.0:8440/cams/",
-  "RECONNECT_MAX_TIMEOUT": 60000, 
-  "VIDEO_STREAM_TYPE": "video_only_h264"
-}
