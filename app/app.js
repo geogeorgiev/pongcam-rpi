@@ -165,9 +165,8 @@ function init() {
         }
 
         if ((res.statusCode === 403 || res.statusCode === 401) && !refreshed) {
-            const refreshUrl = CAM_REFRESH_URL
-            
-            return auth.refreshToken(refreshUrl, creds, onRefresh)
+ 
+            return auth.refreshToken(CAM_REFRESH_URL, creds, onRefresh)
         } 
 
         jsonfile.writeFileSync(credsFile, creds, {spaces: 2})

@@ -5,6 +5,6 @@ if [ $PROCS != 3 ]; then
 	
 	sudo /usr/bin/pkill gst
         sudo /usr/bin/pkill node
-	su pi -c 'cd /home/pi/pongcam && /usr/local/bin/node app.js'
+	su pi -c 'cd /home/pi/pongcam/app && /usr/local/bin/node app.js'
 	echo "Server restart at `date`"
 fi

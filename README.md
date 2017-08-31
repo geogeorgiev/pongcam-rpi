@@ -2,14 +2,22 @@
 
 A software for transforming a Raspberry Pi into a live video streaming camera. It provides the tools for communicating with a signaling server and sending video to a media server. Future work might include config app that helps users set up the the underlying device. 
 
+## Install Raspbian image
+
+### Put the image on an SD card (official instructions)
+- Mac: https://www.raspberrypi.org/documentation/installation/installing-images/mac.md
+- Linux: https://www.raspberrypi.org/documentation/installation/installing-images/linux.md
+- Windows: https://www.raspberrypi.org/documentation/installation/installing-images/windows.md
+
+### Scripts
+
 
 ## Dependencies
 
 - Raspbian + Internet connection
 - Gstreamer 1.0 + base, good and ugly plugins (and 'bad' if using the raspivid capture option)
 
-
-## Install
+## Install app
 
 	cd pongcam
 	yarn install
