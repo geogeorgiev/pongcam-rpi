@@ -1,10 +1,6 @@
 const d = {}
 
-d.CAM_START = 'cam_start'
-d.CAM_STOP = 'cam_stop'
-d.CAM_EVENT = 'cam_event'
-d.CAM_OFFER = 'cam_offer'
-d.CAM_ANSWER = 'cam_answer'
+d.AUTH = 'auth'
 
 d.STREAM_ID = 'stream_id'
 d.SDP_OFFER = 'sdp_offer'

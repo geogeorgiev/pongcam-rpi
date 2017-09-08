@@ -7,13 +7,10 @@
 'use strict'
 
 const ENV = process.env.NODE_ENV
-
 const LIB = './'
-
 const d = require(LIB + 'definitions')
 const logger = require(LIB + 'logger')
-const child = require('child_process')
-
+const GstManager = require(LIB + 'GstManager')
 
 class SignalingHandler {
 
@@ -21,138 +18,67 @@ class SignalingHandler {
     constructor(args) {
 
         this.ws = args.ws
-        this.mediaClient = args.mediaClient
         this.cam = args.cam
-        this.camID = args.cam.uuid
-        this.camState = d.CAM_STATE.OFF
-        this.streamHost = null
-        this.streamPort = null     
-
-    }
-
-
-    startStream(msg) {
-
-        this.onStreamStart(msg)
-    }
-
-
-    onStreamStart(msg) {
-
-        const offer = this.mediaClient.generateOffer()
-        const res = { id: d.SDP_OFFER }
-        res[d.SDP_OFFER] = offer
-        res[d.STREAM_TYPE] = d.STREAM_TYPE_RTP
-        this.send(res)
-    }
-
-
-    onSdpAnswer(msg) { 
-
-        const $this = this
-        const answer = msg[d.SDP_ANSWER]
+        this.camID = this.cam.uuid
         
-        if (!answer) return this.sendError('onSdpAnswer: No answer received.', 400)
+        this.mediaManager = new GstManager()
+    }
+
+
+    onStart(msg) {
+
+        this.send({ id: 'offer' })
+    }
+
+   
+    onAnswer(msg) { 
+
+        if (!msg.answer) return this.sendError('No answer sent.', 400)
         
-        this.mediaClient.processAnswer(answer, (err, data) => {
+        const port = msg.answer.port
+        const host = msg.answer.host
+        
+        this.mediaManager.startMJPEGSender({port: port, host: host}, (err) => {
             
             if (err) return this.sendError(err)
-            
-            this.streamDest = data
-            
-            const res = { id: d.SDP_ANSWER }
-            this.send(res)
-            
-            this.turnOn(onTurnOn)
+
+            this.send({ id: 'start' })
         })
-
-
-        function onTurnOn(err) {
-            
-            if (err) return $this.sendError(err, 500)
-            
-            const res = { id: d.CAM_STATE_KEY }
-            res[d.CAM_STATE_KEY] = $this.camState
-            $this.send(res)
-        } 
+ 
     }
 
 
-    onStreamStop(msg) {
+    onStop(msg) {
 
-        this.turnOff((err) => {
+        this.mediaManager.stopMJPEGSender((err) => {
             
             if (err) return this.sendError(err)
-            
-            const res = { id: d.CAM_STATE_KEY }
-            res[d.CAM_STATE_KEY] = this.camState
-            this.send(res)
+
+            this.send({ id: 'stop' })
         })
     }
 
 
-    turnOn(callback) {
-        
-        // if cam is ON, return - it's on already.
-        
-        if (this.camState === d.CAM_STATE.ON) return callback(null)
+    onSettings(msg) {
 
-        logger.info('Cam state', this.camState)
-        logger.info('Turning camera on.')
+        if (!msg.settings) return this.sendError('No settings sent.', 400)
 
-        const opts = {}
-        opts.host = this.streamDest.host
-        opts.port = this.streamDest.port // config.APP_URL
-
-        this.mediaClient.startStream(opts, (err, proc) => {
-            
-            if (err) return callback(err)
-        logger.info('Starting stream with PID: ' + proc.pid)
-            this.streamProc = proc
-            this.camState = d.CAM_STATE.ON
-          
-        })
+        const newSetting = msg.settings
     }
 
-
-    turnOff(callback) {
-        
-        // if cam is NOT ON, return - it's not streaming anyways. 
-        const camMode = this.cam.profile.mode
-        if (this.camState === d.CAM_STATE.OFF || camMode === d.CAM_MODE.ACTIVE) {
-            return callback(null)
-        }
-
-        logger.info('Cam state', this.camState)
-        logger.info('Turning camera off.')
-
-        this.mediaClient.stopStream(this.streamProc, (err) => {
-
-            if (err) return callback(err)
-
-            this.camState = d.CAM_STATE.OFF
-
-            callback(null)
-        })
-    }
     
-
     onSessionOpen(url) {
 
-        logger.debug('Session is opened with signaling server @ ', url)
-        
-        setTimeout(() => {
-            
-            if (this.cam.profile.mode === 0) this.startStream(null)
-        }, 1000)
+        logger.debug('\nSession with ' + url + ' is OPENED.')
     }
 
 
-    onSessionClose(evt) {
+    onSessionClose(url) {
 
-        logger.info('Closing session ' + this.sessionId)
+        logger.debug('Session with ' + url + ' is CLOSED.\n')
     
-        this.mediaClient.stopStream(this.streamProc, (err) => {            
+        this.mediaManager.stopMJPEGSender((err) => {    
+                
             if (err) logger.error(err)
         })
     }
@@ -162,33 +88,16 @@ class SignalingHandler {
             
         logger.error(err)
         
-        if (!this.proc) return //this.mediaClient.killAll() 
+        this.mediaManager.stopMJPEGSender((err) => {  
 
-        this.mediaClient.stopStream(this.streamProc, (err) => {            
             if (err) logger.error(err)
         })
-    
-    
-        
     }
 
     
     onError(err) {
+
         logger.error(err)
-    }
-
-
-    onMediaFlow(msg) {
-
-        const mediaFlow = msg[d.MEDIA_FLOW]
-        logger.debug('Media flow: ', mediaFlow)
-    }
-
-
-    onMediaState(msg) {
-
-        const mediaState = msg[d.MEDIA_STATE]
-        logger.debug('Media state: ', mediaState)
     }
 
 

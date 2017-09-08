@@ -70,15 +70,15 @@ function connectWebsocket(cam) {
         headers: { 'Authorization': 'Bearer ' + creds.access_token }
     })
    
+   
     const args = {
         ws: ws, 
-        mediaClient: new MediaClient(), 
         cam: cam
     }
 
     const handler = new SignalingHandler(args)
 
-    ws.on('open', (evt) => {
+    ws.on('open', () => {
         logger.debug('... go!')
         attemptCount = 0
         handler.onSessionOpen(SIG_URL)
@@ -89,8 +89,8 @@ function connectWebsocket(cam) {
         attemptWebsocketConn(cam)
     })
 
-    ws.on('close', (evt) => {
-        handler.onSessionClose(evt)
+    ws.on('close', () => {
+        handler.onSessionClose(SIG_URL)
         attemptWebsocketConn(cam)
     })
 
@@ -101,31 +101,22 @@ function connectWebsocket(cam) {
 
         switch (msg.id) {
             
-            case d.STREAM_START:
-                handler.onStreamStart(msg)
-                break
+            case 'start':
+                handler.onStart(msg); break
 
-            case d.SDP_ANSWER:
-                handler.onSdpAnswer(msg)
-                break
-            
-            case d.STREAM_STOP:
-                handler.onStreamStop(msg)
-                break
-        
-            case d.MEDIA_FLOW:
-                handler.onMediaFlow(msg)
-                break
-            
-            case d.MEDIA_STATE:
-                handler.onMediaState(msg)
-                break
+            case 'stop':
+                handler.onStop(msg); break
 
-            case d.ERROR:
-                handler.onError(msg)
-                break
+            case 'answer':
+                handler.onAnswer(msg); break
+
+            case 'settings':
+                handler.onSettings(msg); break
+
+            case 'error':
+                handler.onError(msg); break
                 
-            default:
+            default: 
                 break 
         }
     })
