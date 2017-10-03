@@ -14,12 +14,13 @@ const d = require(LIB + 'definitions')
 const logger = require(LIB + 'logger')
 
 
-
 class OAuthService {
 	
 	constructor(request) {
 		this.request = request
 	}
+
+	
 
 	verifyToken(url, creds, callback) {
 	    

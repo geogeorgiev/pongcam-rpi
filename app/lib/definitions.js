@@ -1,14 +1,15 @@
 const d = {}
 
 d.AUTH = 'auth'
-
-d.STREAM_ID = 'stream_id'
-d.SDP_OFFER = 'sdp_offer'
-d.SDP_ANSWER = 'sdp_answer'
-d.STREAM_START = 'stream_start'
-d.STREAM_STOP = 'stream_stop'
-d.ICE_CANDIATE = 'ice_candidate'
-
+d.START = 'start'
+d.STOP = 'stop'
+d.CAM_EVENT = 'cam_event'
+d.OFFER = 'offer'
+d.ANSWER = 'answer'
+d.CMD = 'cmd'
+d.MJPEG_STREAM = 'mjpeg_stream'
+d.RELOAD = 'reload'
+d.CONFIG = 'config'
 d.STREAM_TYPE_KEY = "stream_type"
 d.STREAM_TYPE = {
 	RTP: "RTP"
@@ -26,28 +27,6 @@ d.VIDEO_FORMAT = {
 	H264: 'h264',
 	VP8: 'vp8'
 }
-
-d.MEDIA_STATE_KEY = 'media_state'
-
-d.MEDIA_FLOW_KEY = 'media_flow'
-d.MEDIA_FLOW = {
-	FLOWING: 'FLOWING',
-	NOT_FLOWING:'NOT_FLOWING'
-}
-
-d.CAM_MODE_KEY = 'cam_mode'
-d.CAM_MODE = {
-	PASSIVE: 0,
-	ACTIVE: 1
-}
-
-d.CAM_STATE_KEY = 'cam_state'
-d.CAM_STATE = {
-	OFF: 0,
-	READY: 1,
-	ON: 2,
-}
-
 d.CLOSE = 'close'
 d.ERROR = 'error'
 d.MESSAGE = 'message'

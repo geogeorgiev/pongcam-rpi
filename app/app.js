@@ -19,7 +19,6 @@ const config = require('config')
 const express = require('express')
 const WebSocket = require('ws')
 const request = require('request')
-const MediaClient = require(LIB + 'KurentoClient')
 const SignalingHandler = require(LIB + 'SignalingHandler')
 const d = require(LIB + 'definitions')
 const logger = require(LIB + 'logger')
@@ -48,7 +47,7 @@ if (fs.existsSync(credsFile)) {
 
 var attemptCount = 0
 
-function attemptWebsocketConn(cam) { 
+function attemptWebsocketConn(cam, creds) { 
     
     attemptCount++
     
@@ -57,11 +56,11 @@ function attemptWebsocketConn(cam) {
     
     logger.info('Reconnecting after ' + Math.round(timeout / 1000) + 'sec.') 
     
-    setTimeout(() => {connectWebsocket(cam) }, timeout)
+    setTimeout(() => { connectWebsocket(cam, creds) }, timeout)
 }
 
 
-function connectWebsocket(cam) {    
+function connectWebsocket(cam, creds) {    
     
     logger.debug('Connecting @' + SIG_URL +'. Ready, steady ...')
     
@@ -70,10 +69,10 @@ function connectWebsocket(cam) {
         headers: { 'Authorization': 'Bearer ' + creds.access_token }
     })
    
-   
     const args = {
         ws: ws, 
-        cam: cam
+        cam: cam,
+        creds: creds
     }
 
     const handler = new SignalingHandler(args)
@@ -86,37 +85,47 @@ function connectWebsocket(cam) {
 
     ws.on('error', (err) => {
         handler.onSessionError(err)
-        attemptWebsocketConn(cam)
+        attemptWebsocketConn(cam, creds)
     })
 
     ws.on('close', () => {
         handler.onSessionClose(SIG_URL)
-        attemptWebsocketConn(cam)
+        attemptWebsocketConn(cam, creds)
     })
 
     ws.on('message', (_msg, flags) => {
         
-        const msg = JSON.parse(_msg)
-        logger.debug('==> Cam message ID "' + msg.id + '".')
+        try {
+            logger.info('MSG', _msg)
+            var msg = JSON.parse(_msg)
+            var payload = msg.payload
+            logger.info('==> Msg ID: "' + payload.id + '"')
+        } catch (e) {
+            return this.sendError(e)
+        }
 
-        switch (msg.id) {
+        switch (payload.id) {
             
-            case 'start':
-                handler.onStart(msg); break
-
-            case 'stop':
-                handler.onStop(msg); break
-
-            case 'answer':
-                handler.onAnswer(msg); break
-
-            case 'settings':
-                handler.onSettings(msg); break
-
-            case 'error':
-                handler.onError(msg); break
-                
+            case d.START:
+                handler.onStart(payload)
+                break
+            case d.STOP:
+                handler.onStop(payload)
+                break
+            case d.ANSWER:
+                handler.onAnswer(payload)
+                break
+            case d.RELOAD:
+                handler.onReload(payload)
+                break
+            case d.CONFIG:
+                handler.reconfigure()
+                break
+            case d.ERROR:
+                handler.onError(payload)
+                break
             default: 
+                logger.warn('Unrecognized message.')
                 break 
         }
     })
@@ -160,15 +169,14 @@ function init() {
             return auth.refreshToken(CAM_REFRESH_URL, creds, onRefresh)
         } 
 
-        jsonfile.writeFileSync(credsFile, creds, {spaces: 2})
-
-        const camDetailUrl = CAM_SERVICES_URL + data.cam + '/'
+        
+        const camDetailUrl = CAM_SERVICES_URL + data.cam_uuid + '/'
         
         auth.get(camDetailUrl, creds, (err, res, cam) => {
-
+            logger.info(cam)
             if (err) return logger.error(err)
 
-            attemptWebsocketConn(cam)
+            attemptWebsocketConn(cam, creds)
         })
         
     }
@@ -180,7 +188,7 @@ function init() {
 
         creds.access_token= data.access_token
         creds.refresh_token = data.refresh_token
-        jsonfile.writeFileSync(credsFile, creds, {spaces: 2})
+        jsonfile.writeFileSync(credsFile, creds, { spaces: 2 })
 
         refreshed = true
 

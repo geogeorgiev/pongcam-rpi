@@ -19,7 +19,7 @@ class GstManager {
   startMJPEGSender(opts, callback) {
     
     const srcs = { 
-      test: 'videotestsrc pattern=0',
+      test: 'videotestsrc pattern=ball is-live=true',
       v4l2: 'v4l2src device=/dev/video0'
     }
 
@@ -36,6 +36,7 @@ class GstManager {
       ' ! "video/x-raw, width=' + config.video.width + 
       ', height=' + config.video.height + 
       ', framerate=' + config.video.framerate + '"' +  
+      //' ! videoflip method=clockwise ! videoconvert' +
       ' ! jpegenc ! rtpjpegpay' +
       ' ! udpsink host=' + opts.host + ' port=' + opts.port 
 
@@ -52,6 +53,8 @@ class GstManager {
 
   stopMJPEGSender(callback) {
 
+    if (!this.pid) return
+      
     kill(this.pid, 'SIGINT', (err) => {
 
       if (err) return callback(err)
